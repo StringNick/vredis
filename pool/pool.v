@@ -11,89 +11,64 @@ pub const (
 	err_pool_timeout = error('redis: connection pool timeout')
 )
 
-
 pub struct Options {
 mut:
-	dialer fn (context.Context) ?&net.TcpConn
-	pool_fifo bool
-	pool_size int
-	min_idle_conns int
-	max_conn_age time.Duration
-	pool_timeout time.Duration
-	idle_timeout time.Duration
+	dialer          fn (context.Context) ?&net.TcpConn
+	pool_fifo       bool
+	pool_size       int
+	min_idle_conns  int
+	max_conn_age    time.Duration
+	pool_timeout    time.Duration
+	idle_timeout    time.Duration
 	idle_check_freq time.Duration
 }
 
 pub struct ConnPool {
 mut:
-	conns_mu &sync.Mutex // mutex
+	conns_mu sync.Mutex // mutex
 
 	opt Options
 
 	dial_errors_num u64 // atomic
 
 	last_dial_error IError
-	queue          chan bool
-	conns          []&Conn
-	idle_conns     []&Conn
-	closed_ch      chan bool
-	pool_size      int
-	idle_conns_len int
-	closed_        u64
+	queue           chan bool
+	conns           []Conn
+	idle_conns      []Conn
+	closed_ch       chan bool
+	pool_size       int
+	idle_conns_len  int
+	closed_         u64
 }
 
 interface Pooler {
 mut:
-	new_conn(context.Context) ?&Conn
+	new_conn(context.Context) ?Conn
 	close_conn(mut Conn) ?
-	get(mut context.Context) ?&Conn
-	put(context.Context, mut &Conn)
-	remove(context.Context, mut &Conn, IError)
+	get(mut context.Context) ?Conn
+	put(context.Context, mut Conn)
+	remove(context.Context, mut Conn, IError)
 	len() int
 	idle_len() int
 	close() ?
 }
 
-fn (mut p ConnPool) reaper(freq time.Duration) {
-	for {
-		select {
-			_ := <- p.closed_ch {
-				return
-			}
-			freq * 1 {
-				if p.closed() {
-					return
-				}
-
-				_ = p.reap_stale_conns() or {
-					continue
-				}
-			}
-		}
-	}
-}
-
-
 pub fn new_conn_pool(opt Options) &ConnPool {
+	println('new_conn_pool')
 	mut p := &ConnPool{
 		opt: opt
 		last_dial_error: none
 		queue: chan bool{cap: opt.pool_size}
-		conns: []&Conn{cap: opt.pool_size}
-		idle_conns: []&Conn{cap: opt.pool_size}
+		conns: []Conn{cap: opt.pool_size}
+		idle_conns: []Conn{cap: opt.pool_size}
 		closed_ch: chan bool{}
-
-		conns_mu: sync.new_mutex()
 	}
 
 	p.conns_mu.init()
 	p.conns_mu.@lock()
+
 	p.check_min_idle_conns()
 	p.conns_mu.unlock()
-
-	if opt.idle_timeout > 0 && opt.idle_check_freq > 0 {
-		go p.reaper(opt.idle_check_freq)
-	}
 
 	return p
 }
@@ -103,6 +78,8 @@ fn (mut p ConnPool) check_min_idle_conns() {
 		return
 	}
 
+	println('check_min_idle_conns')
+
 	for p.pool_size < p.opt.pool_size && p.idle_conns_len < p.opt.min_idle_conns {
 		p.pool_size++
 		p.idle_conns_len++
@@ -111,19 +88,23 @@ fn (mut p ConnPool) check_min_idle_conns() {
 			p.add_idle_conn() or {
 				if err != pool.err_closed {
 					p.conns_mu.@lock()
+
 					p.pool_size--
 					p.idle_conns_len--
 					p.conns_mu.unlock()
 				}
+				return
 			}
 		}()
 	}
 }
 
 fn (mut p ConnPool) add_idle_conn() ? {
+	println('add_idle_conn')
 	mut cn := p.dial_conn(context.todo(), true)?
 
 	p.conns_mu.@lock()
+
 	defer {
 		p.conns_mu.unlock()
 	}
@@ -137,19 +118,23 @@ fn (mut p ConnPool) add_idle_conn() ? {
 	p.idle_conns << cn
 }
 
-fn (mut c ConnPool) dial_conn(ctx context.Context, pooled bool) ?&Conn {
+fn (mut c ConnPool) dial_conn(ctx context.Context, pooled bool) ?Conn {
+	println('dialin connect')
 	if c.closed() {
 		return pool.err_closed
 	}
-
+	println('dialin connect123')
 	c.conns_mu.@lock()
+	println('dialin connect1')
 	mut dial_errors_num := c.dial_errors_num
 	c.conns_mu.unlock()
 	if dial_errors_num > u64(c.opt.pool_size) {
 		return c.last_dial_error
 	}
+	println('dialin connect2')
 
 	net_conn := c.opt.dialer(ctx) or {
+		println('dial error $err')
 		c.conns_mu.@lock()
 		c.last_dial_error = err
 		c.dial_errors_num++
@@ -161,6 +146,8 @@ fn (mut c ConnPool) dial_conn(ctx context.Context, pooled bool) ?&Conn {
 		}
 		return err
 	}
+
+	println('successfully dialed conn')
 
 	mut cn := new_conn(net_conn)
 	cn.pooled = pooled
@@ -193,10 +180,12 @@ fn (mut c ConnPool) try_dial() {
 	}
 }
 
-fn (mut p ConnPool) new_conn_(ctx context.Context, pooled bool) ?&Conn {
+fn (mut p ConnPool) new_conn_(ctx context.Context, pooled bool) ?Conn {
+	println('new_conn_: new conn initiated')
 	mut cn := p.dial_conn(ctx, pooled)?
-
+	println('new_conn_: dialed new conn')
 	p.conns_mu.@lock()
+
 	defer {
 		p.conns_mu.unlock()
 	}
@@ -215,15 +204,18 @@ fn (mut p ConnPool) new_conn_(ctx context.Context, pooled bool) ?&Conn {
 		}
 	}
 
+	println('new_conn_: return new cn')
+
 	return cn
 }
 
-pub fn (mut p ConnPool) new_conn(ctx context.Context) ?&Conn {
+pub fn (mut p ConnPool) new_conn(ctx context.Context) ?Conn {
 	return p.new_conn_(ctx, false)
 }
 
 // get returns existed connection from the pool or creates a new one.
-pub fn (mut p ConnPool) get(mut ctx context.Context) ?&Conn {
+pub fn (mut p ConnPool) get(mut ctx context.Context) ?Conn {
+	println('pool_conn: get')
 	if p.closed() {
 		return pool.err_closed
 	}
@@ -231,22 +223,34 @@ pub fn (mut p ConnPool) get(mut ctx context.Context) ?&Conn {
 	p.wait_turn(mut ctx)?
 
 	for {
+		//	time.sleep(time.second)
 		p.conns_mu.@lock()
 		mut cn := p.pop_idle(ctx) or {
 			p.conns_mu.unlock()
+			if err == error('pop_idle: empty') {
+				println('get: break and trying new conn')
+				break
+			}
+			println('get: pop_idle return err $err')
 			return err
 		}
 		p.conns_mu.unlock()
-
+		/*
+		TODO: isHealthy
 		if p.is_stale_conn(mut cn) {
+			println('stale conn')
 			p.close_conn_(mut cn) or {}
 			continue
-		}
+		}*/
 
 		return cn
 	}
 
-	return none
+	newcn := p.new_conn_(ctx, true) or {
+		p.free_turn()
+		return err
+	}
+	return newcn
 }
 
 fn (mut p ConnPool) get_turn() {
@@ -256,7 +260,7 @@ fn (mut p ConnPool) get_turn() {
 fn (mut p ConnPool) wait_turn(mut ctx context.Context) ? {
 	done := ctx.done()
 	select {
-		_ := <- done {
+		_ := <-done {
 			return ctx.err()
 		}
 		p.queue <- true {
@@ -269,21 +273,18 @@ fn (mut p ConnPool) wait_turn(mut ctx context.Context) ? {
 }
 
 fn (mut p ConnPool) free_turn() {
-	_ := <- p.queue
+	_ := <-p.queue
 }
 
-fn (mut p ConnPool) pop_idle(ctx context.Context) ?&Conn {
+fn (mut p ConnPool) pop_idle(ctx context.Context) ?Conn {
 	if p.closed() {
 		return pool.err_closed
 	}
-
+	println('pop_idle: init')
 	n := p.idle_conns.len
 	if n == 0 {
-		newcn := p.new_conn_(ctx, true) or {
-			p.free_turn()
-			return err
-		}
-		return newcn
+		println('pop_idle: empty')
+		return error('pop_idle: empty')
 	}
 
 	defer {
@@ -302,7 +303,7 @@ fn (mut p ConnPool) pop_idle(ctx context.Context) ?&Conn {
 	}
 }
 
-pub fn (mut p ConnPool) put(ctx context.Context, mut cn &Conn) {
+pub fn (mut p ConnPool) put(ctx context.Context, mut cn Conn) {
 	// TODO: check bufferred content pool/pool
 	if !cn.pooled {
 		p.remove(ctx, mut cn, none)
@@ -310,32 +311,35 @@ pub fn (mut p ConnPool) put(ctx context.Context, mut cn &Conn) {
 	}
 
 	p.conns_mu.@lock()
+
 	p.idle_conns << cn
 	p.idle_conns_len++
 	p.conns_mu.unlock()
+
 	p.free_turn()
 }
 
-fn (mut p ConnPool) remove(ctx context.Context, mut cn &Conn, reason IError) {
+fn (mut p ConnPool) remove(ctx context.Context, mut cn Conn, reason IError) {
 	p.remove_conn_with_lock(cn)
 	p.free_turn()
 	p.close_conn_(mut cn) or {}
 }
 
-pub fn (mut p ConnPool) close_conn(mut cn &Conn) ? {
+pub fn (mut p ConnPool) close_conn(mut cn Conn) ? {
 	p.remove_conn_with_lock(cn)
 	return p.close_conn_(mut cn)
 }
 
-fn (mut p ConnPool) remove_conn_with_lock(cn &Conn) {
+fn (mut p ConnPool) remove_conn_with_lock(cn Conn) {
 	p.conns_mu.@lock()
+
 	p.remove_conn(cn)
 	p.conns_mu.unlock()
 }
 
-fn (mut p ConnPool) remove_conn(cn &Conn) {
+fn (mut p ConnPool) remove_conn(cn Conn) {
 	for i, c in p.conns {
-		if voidptr(c) == voidptr(cn) {
+		if voidptr(c.net_conn) == voidptr(cn.net_conn) {
 			p.conns.delete(i)
 			if cn.pooled {
 				p.pool_size--
@@ -345,27 +349,32 @@ fn (mut p ConnPool) remove_conn(cn &Conn) {
 	}
 }
 
-fn (mut p ConnPool) close_conn_(mut cn &Conn) ? {
+fn (mut p ConnPool) close_conn_(mut cn Conn) ? {
 	// TODO: onclose hook
 	return cn.close()
 }
 
 pub fn (mut p ConnPool) len() int {
 	p.conns_mu.@lock()
+
 	n := p.conns.len
 	p.conns_mu.unlock()
+
 	return n
 }
 
 pub fn (mut p ConnPool) idle_len() int {
 	p.conns_mu.@lock()
+
 	n := p.idle_conns_len
 	p.conns_mu.unlock()
+
 	return n
 }
 
-pub fn (mut p ConnPool) filter(f fn (&Conn) bool) ? {
+pub fn (mut p ConnPool) filter(f fn (Conn) bool) ? {
 	p.conns_mu.@lock()
+
 	defer {
 		p.conns_mu.unlock()
 	}
@@ -389,7 +398,7 @@ pub fn (mut p ConnPool) filter(f fn (&Conn) bool) ? {
 
 pub fn (mut p ConnPool) close() ? {
 	if p.closed() {
-		return err_closed
+		return pool.err_closed
 	}
 
 	stdatomic.store_u64(&p.closed_, 1)
@@ -397,7 +406,9 @@ pub fn (mut p ConnPool) close() ? {
 
 	mut first_err := IError(none)
 	p.conns_mu.@lock()
-	for mut cn in p.conns {
+
+	for i := 0; i < p.conns.len; i++ {
+		mut cn := p.conns[i]
 		p.close_conn_(mut cn) or {
 			if first_err == IError(none) {
 				first_err = err
@@ -405,55 +416,16 @@ pub fn (mut p ConnPool) close() ? {
 		}
 	}
 
-	p.conns = []&Conn{}
+	p.conns = []Conn{}
 	p.pool_size = 0
-	p.idle_conns = []&Conn{}
+	p.idle_conns = []Conn{}
 	p.idle_conns_len = 0
 	p.conns_mu.unlock()
 
 	return first_err
 }
 
-
-
-pub fn (mut p ConnPool) reap_stale_conns() ?int {
-	mut n := int(0)
-
-	for {
-		p.get_turn()
-
-		p.conns_mu.@lock()
-		mut cn := p.reap_stale_conn() or {
-			return n
-		}
-		p.conns_mu.unlock()
-
-		p.free_turn()
-
-		p.close_conn_(mut cn) or {}
-		n++
-	}
-
-	return n
-}
-
-fn (mut p ConnPool) reap_stale_conn() ?&Conn {
-	if p.idle_conns.len == 0 {
-		return error('empty con')
-	}
-
-	mut cn := p.idle_conns.first()
-	if !p.is_stale_conn(mut cn) {
-		return error('stale conn')
-	}
-
-	p.idle_conns.delete(0)
-	p.idle_conns_len--
-	p.remove_conn(cn)
-	return cn
-}
-
-fn (mut p ConnPool) is_stale_conn(mut cn &Conn) bool {
+fn (mut p ConnPool) is_stale_conn(mut cn Conn) bool {
 	if p.opt.idle_timeout == 0 && p.opt.max_conn_age == 0 {
 		mut res := true
 		conn_check(cn.net_conn) or { res = false }
@@ -461,7 +433,7 @@ fn (mut p ConnPool) is_stale_conn(mut cn &Conn) bool {
 	}
 
 	now := time.now()
-	if p.opt.idle_timeout > 0 && now -(cn.used_at()) >= p.opt.idle_timeout {
+	if p.opt.idle_timeout > 0 && now - (cn.used_at()) >= p.opt.idle_timeout {
 		return true
 	}
 	if p.opt.max_conn_age > 0 && now - (cn.created_at) >= p.opt.max_conn_age {

@@ -19,8 +19,8 @@ pub mut:
 	inited bool
 }
 
-pub fn new_conn(net_conn &net.TcpConn) &Conn {
-	return &Conn{
+pub fn new_conn(net_conn &net.TcpConn) Conn {
+	return Conn{
 		net_conn: net_conn
 		created_at: time.now()
 		wr: proto.new_writer(util.new_tcp_writer(net_conn))

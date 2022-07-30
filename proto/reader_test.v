@@ -69,5 +69,5 @@ fn test_read_line() {
 	str := rd.read_line() or { panic(err) }
 	assert is_equal(b[..b.len-2], str.bytes())
 	
-	print('str $str and b $b')
+	//print('str $str and b $b')
 }

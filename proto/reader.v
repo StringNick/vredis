@@ -28,7 +28,7 @@ const (
 // Streamed           = "EOF:"
 // StreamedAggregated = '?'
 
-const nil_value = new_redis_error('redis: nil')
+const nil_value = error('redis: nil')
 
 struct RedisError {
 	code int
@@ -98,27 +98,35 @@ pub fn (mut r Reader) peek_reply_type() ?u8 {
 pub fn (mut r Reader) read_line() ?string {
 	line := r.rd.read_line()?
 
+	println('read_line: base line $line')
+
 	match u8(line[0]) {
 		proto.resp_error {
+			println('resp err')
 			return IError(parse_error_reply(line))
 		}
 		proto.resp_nil {
-			return IError(proto.nil_value)
+			println('resp nil')
+			return proto.nil_value
 		}
 		proto.resp_blob_error {
+			println('resp err')
 			blob_error := r.read_string_reply(line)?
 			return IError(new_redis_error(blob_error))
 		}
 		proto.resp_attr {
+			println('attr')
 			r.discard(line)?
 			return r.read_line()
 		}
-		else {}
+		else {
+			println('something else')
+		}
 	}
 
 	// Compatible with RESP2
 	if is_nil_reply(line) {
-		return IError(proto.nil_value)
+		return proto.nil_value
 	}
 
 	return line
@@ -129,29 +137,29 @@ type Any = Empty | RedisError | []Any | big.Integer | bool | f64 | i64 | map[voi
 
 pub fn (mut r Reader) read_reply() ?string {
 	line := r.read_line()?
-	s := line[1..]
-	return s
-	/*
+	println('read line resp $line')
+	
 	match line[0] {
 		proto.resp_status {
 			s := line[1..]
 			return s
 		}
 		proto.resp_int {
-			i := strconv.parse_int(line[1..], 10, 64)?
-			return i
+			//i := strconv.parse_int(line[1..], 10, 64)?
+			//return i
+			return line[1..]
 		}
 		proto.resp_float {
-			f := r.read_float(line)?
-			return f
+			//f := r.read_float(line)?
+			return line[1..]
 		}
 		proto.resp_bool {
-			b := r.read_bool(line)?
-			return b
+			//b := r.read_bool(line)?
+			return line[1..]
 		}
 		proto.resp_big_int {
-			i := r.read_big_int(line)?
-			return i
+			//i := r.read_big_int(line)?
+			return line[1..]
 		}
 		proto.resp_string {
 			s := r.read_string_reply(line)?
@@ -161,19 +169,18 @@ pub fn (mut r Reader) read_reply() ?string {
 			v := r.read_verb(line)?
 			return v
 		}
-		proto.resp_array, proto.resp_set, proto.resp_push {
-			s := r.read_slice(line)?
-			return s
-		}
-		proto.resp_map {
-			m := r.read_map(line)?
-			return m
-		}
+		//proto.resp_array, proto.resp_set, proto.resp_push {
+		//	s := r.read_slice(line)?
+		//	return s
+		//}
+		//proto.resp_map {
+		//	m := r.read_map(line)?
+		//	return m
+		//}
 		else {
 			return error('redis: can\'t parse $line')
 		}
-		
-	}*/
+	}
 }
 
 fn (mut r Reader) read_map(line string) ?map[string]string {

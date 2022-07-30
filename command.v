@@ -1,6 +1,5 @@
 module vredis
 
-import context
 import proto
 
 interface Cmder {
@@ -19,7 +18,6 @@ mut:
 
 struct BaseCmd {
 mut:
-	ctx     context.Context
 	args    []string
 	key_pos i8
 	err     string
@@ -82,16 +80,15 @@ mut:
 	val string
 }
 
-pub fn new_cmd(ctx context.Context, args ...string) &Cmd {
+pub fn new_cmd(args ...string) &Cmd {
 	return &Cmd{
 		BaseCmd: BaseCmd{
-			ctx: ctx
 			args: args
 		}
 	}
 }
 
-pub fn (mut cmd Cmd) value() string {
+pub fn (cmd Cmd) value() string {
 	return cmd.val
 }
 
@@ -99,7 +96,7 @@ pub fn (mut cmd Cmd) set_val(val string) {
 	cmd.val = val
 }
 
-pub fn (mut cmd Cmd) result() ?string {
+pub fn (cmd Cmd) result() ?string {
 	if cmd.err != '' {
 		return error(cmd.err)
 	}
@@ -111,41 +108,7 @@ fn (mut cmd Cmd) read_reply(mut rd proto.Reader) ? {
 	cmd.val = rd.read_reply()?
 }
 
-pub struct StatusCmd {
-	BaseCmd
-mut:
-	val string
-}
-
-pub fn new_status_cmd(ctx context.Context, args ...string) &StatusCmd {
-	return &StatusCmd{
-		BaseCmd: BaseCmd{
-			ctx: ctx
-			args: args
-		}
-	}
-}
-
-pub fn (cmd StatusCmd) value() string {
-	return cmd.val
-}
-
-pub fn (mut cmd StatusCmd) set_val(val string) {
-	cmd.val = val
-}
-
-pub fn (cmd StatusCmd) result() ?string {
-	if cmd.err != '' {
-		return error(cmd.err)
-	}
-
-	return cmd.val
-}
-
-fn (mut cmd StatusCmd) read_reply(mut rd proto.Reader) ? {
-	cmd.val = rd.read_reply()?
-}
-
 fn write_cmd(mut wr proto.Writer, cmd Cmder) ? {
+	eprintln('write_cmd: $cmd')
 	return wr.write_args(cmd.args())
 }

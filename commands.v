@@ -12,7 +12,7 @@ fn use_precise(dur time.Duration) bool {
 	return dur < time.second || dur % time.second != 0
 }
 
-fn format_ms(ctx context.Context, dur time.Duration) string {
+fn format_ms(dur time.Duration) string {
 	if dur > 0 && dur < time.millisecond {
 		/*
 		internal.Logger.Printf(
@@ -25,7 +25,7 @@ fn format_ms(ctx context.Context, dur time.Duration) string {
 	return strconv.format_int(dur / time.millisecond, 10)
 }
 
-fn format_sec(ctx context.Context, dur time.Duration) string {
+fn format_sec(dur time.Duration) string {
 	if dur > 0 && dur < time.second {
 		/*
 		internal.Logger.Printf(
@@ -42,23 +42,37 @@ struct Cmdble_ {
 	f fn (mut context.Context, mut Cmder)?
 }
 
-pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, expiration time.Duration) &StatusCmd {
+pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, expiration time.Duration) &Cmd {
 	mut args := []string{len: 3, cap: 5}
 	args[0] = 'set'
 	args[1] = key
 	args[2] = value
 	if expiration > 0 {
 		if use_precise(expiration) {
-			args << ['px', format_ms(ctx, expiration)]
+			args << ['px', format_ms(expiration)]
 		} else {
-			args << ['ex', format_sec(ctx, expiration)]
+			args << ['ex', format_sec(expiration)]
 		}
 	} else if expiration == -1 { // TODO: const
 		args << 'keepttl'
 	}
 
-	mut cmd := new_status_cmd(ctx, ...args)
+	mut cmd := new_cmd(...args)
 	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or {}
+	c.f(mut ctx, mut t) or {
+		cmd.err = err.msg()
+	}
+	return cmd
+}
+
+// get Redis `GET key` command.
+pub fn (mut c Cmdble_) get(mut ctx context.Context, key string) &Cmd {
+	mut cmd := new_cmd('get', key)
+	mut t := Cmder(cmd)
+	c.f(mut ctx, mut t) or {
+		println('error arrived $err')
+		cmd.err = err.msg()
+	}
+	
 	return cmd
 }
