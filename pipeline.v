@@ -15,11 +15,10 @@ import context
 // can be retransmitted and commands can be executed more then once.
 // To avoid this: it is good idea to use reasonable bigger read/write timeouts
 // depends of your batch size and/or use TxPipeline.
-interface Pipeliner{
+interface Pipeliner {
 	len() int
 	do(context.Context, ...string) &Cmd
 	process(context.Context, Cmder) ?
 	discard()
 	exec(context.Context) ?[]Cmder
 }
-

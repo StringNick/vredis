@@ -50,7 +50,6 @@ pub fn (mut conn Conn) write(b []u8) ?int {
 	return conn.net_conn.write(b)
 }
 
-
 pub fn (mut conn Conn) with_writer(ctx context.Context, timeout time.Duration) ?&proto.Writer {
 	if timeout != 0 {
 		conn.net_conn.set_write_deadline(time.now().add(timeout))
@@ -61,7 +60,7 @@ pub fn (mut conn Conn) with_writer(ctx context.Context, timeout time.Duration) ?
 
 // TODO: remove after resolving issue
 
-pub fn (mut conn Conn) with_reader(ctx context.Context, timeout time.Duration)?&proto.Reader {
+pub fn (mut conn Conn) with_reader(ctx context.Context, timeout time.Duration) ?&proto.Reader {
 	if timeout != 0 {
 		conn.net_conn.set_read_deadline(time.now().add(timeout))
 	}

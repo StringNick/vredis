@@ -2,17 +2,17 @@ module pool
 
 import context
 
-pub struct SinglePoolConn  {
+pub struct SinglePoolConn {
 mut:
-	pool Pooler
-	cn Conn
+	pool       Pooler
+	cn         Conn
 	sticky_err IError = none
 }
 
 pub fn new_single_pool_conn(pool Pooler, cn Conn) &SinglePoolConn {
 	return &SinglePoolConn{
-		pool: pool,
-		cn:   cn,
+		pool: pool
+		cn: cn
 	}
 }
 

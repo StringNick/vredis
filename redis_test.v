@@ -1,28 +1,62 @@
 module vredis
+
 import context
 import time
-//key string, value string, expiration time.Duration
 
-fn test_q() {
-	//new_client()
-	mut opt := Options{}
+fn setup() ?(context.Context, &Client) {
+	mut opt := Options{
+		addr: 'localhost:6379'
+	}
+
 	mut cl := new_client(mut opt)
-	mut ctx := context.Context(context.EmptyContext(0))
+	mut ctx := context.todo()
+
+	return ctx, cl
+}
+
+fn test_get_set() ? {
+	mut ctx, mut cl := setup()?
 	val := 'bar'
-	key := 'test'
-	
-	res := cl.set(mut ctx, key, val, time.hour).result() or {
-		eprintln('command error result: $err')
-		return
+	key := 'test_key'
+
+	cl.set(mut ctx, key, val, time.hour) or {
+		println('err $err')
+		return err
 	}
 
-	res1 := cl.get(mut ctx, key).result() or {
-		if err == nil_value {
-			eprintln('key not exist')
-			return
-		}
-		eprintln('command get error: $err')
-			return
+	res := cl.get(mut ctx, key)?
+	assert res == val
+
+	del_count := cl.del(mut ctx, key)?
+	assert del_count == 1
+}
+
+fn test_lpush_lrange(mut ctx context.Context, mut cl Client) ? {
+	key, val, val1 := 'test_list', 'val', 'val1'
+
+	push_count := cl.rpush(mut ctx, key, val, val1)?
+	assert push_count == 2
+
+	lrange := cl.lrange(mut ctx, key, 0, -1) or { return err }
+	assert lrange.len == 2
+
+	assert lrange[0] == val && lrange[1] == val1
+
+	del_count := cl.del(mut ctx, key)?
+	assert del_count == 1
+}
+
+fn test_flushall() ? {
+	mut ctx, mut cl := setup()?
+	val := 'bar'
+	key := 'test_key'
+
+	cl.set(mut ctx, key, val, time.hour) or { return err }
+
+	cl.flushall(mut ctx) or { return err }
+
+	res := cl.get(mut ctx, key) or {
+		assert err.msg() == nil_value.msg()
+		''
 	}
-	assert res1 == val
 }

@@ -67,7 +67,7 @@ fn test_read_line() {
 	buf := new_bytes_buffer_reader(b)
 	mut rd := new_reader(buf)
 	str := rd.read_line() or { panic(err) }
-	assert is_equal(b[..b.len-2], str.bytes())
-	
-	//print('str $str and b $b')
+	assert is_equal(b[..b.len - 2], str.bytes())
+
+	// print('str $str and b $b')
 }

@@ -30,11 +30,11 @@ pub mut:
 	// Default is 5 minutes. -1 disables idle timeout check.
 	idle_timeout time.Duration = 5 * time.minute
 
-	pool_fifo bool
-	pool_size int = 10
-	min_idle_conns int
-	max_conn_age time.Duration
-	pool_timeout time.Duration = time.second * 4
+	pool_fifo       bool
+	pool_size       int = 10
+	min_idle_conns  int
+	max_conn_age    time.Duration
+	pool_timeout    time.Duration = time.second * 4
 	idle_check_freq time.Duration = time.minute
 }
 
@@ -112,15 +112,15 @@ fn get_user_password(u urllib.URL) (string, string) {
 
 fn new_conn_pool(opt Options) &pool.ConnPool {
 	return pool.new_conn_pool(pool.Options{
-		dialer: fn[opt](ctx context.Context) ?&net.TcpConn {
-			return opt.dialer(ctx,opt.addr)
-		},
-		pool_fifo:           opt.pool_fifo,
-		pool_size:           opt.pool_size,
-		min_idle_conns:       opt.min_idle_conns,
-		max_conn_age:         opt.max_conn_age,
-		pool_timeout:        opt.pool_timeout,
-		idle_timeout:        opt.idle_timeout,
-		idle_check_freq: opt.idle_check_freq,
+		dialer: fn [opt] (ctx context.Context) ?&net.TcpConn {
+			return opt.dialer(ctx, opt.addr)
+		}
+		pool_fifo: opt.pool_fifo
+		pool_size: opt.pool_size
+		min_idle_conns: opt.min_idle_conns
+		max_conn_age: opt.max_conn_age
+		pool_timeout: opt.pool_timeout
+		idle_timeout: opt.idle_timeout
+		idle_check_freq: opt.idle_check_freq
 	})
 }

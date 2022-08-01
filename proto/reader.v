@@ -135,31 +135,30 @@ pub fn (mut r Reader) read_line() ?string {
 type Empty = u8
 type Any = Empty | RedisError | []Any | big.Integer | bool | f64 | i64 | map[voidptr]Any | string
 
-pub fn (mut r Reader) read_reply() ?string {
+pub fn (mut r Reader) read_reply() ?Any {
 	line := r.read_line()?
 	println('read line resp $line')
-	
+
 	match line[0] {
 		proto.resp_status {
 			s := line[1..]
 			return s
 		}
 		proto.resp_int {
-			//i := strconv.parse_int(line[1..], 10, 64)?
-			//return i
-			return line[1..]
+			i := strconv.parse_int(line[1..], 10, 64)?
+			return i
 		}
 		proto.resp_float {
-			//f := r.read_float(line)?
-			return line[1..]
+			f := r.read_float(line)?
+			return f
 		}
 		proto.resp_bool {
-			//b := r.read_bool(line)?
-			return line[1..]
+			b := r.read_bool(line)?
+			return b
 		}
 		proto.resp_big_int {
-			//i := r.read_big_int(line)?
-			return line[1..]
+			i := r.read_big_int(line)?
+			return i
 		}
 		proto.resp_string {
 			s := r.read_string_reply(line)?
@@ -169,62 +168,49 @@ pub fn (mut r Reader) read_reply() ?string {
 			v := r.read_verb(line)?
 			return v
 		}
-		//proto.resp_array, proto.resp_set, proto.resp_push {
-		//	s := r.read_slice(line)?
-		//	return s
-		//}
-		//proto.resp_map {
-		//	m := r.read_map(line)?
-		//	return m
-		//}
+		proto.resp_array, proto.resp_set, proto.resp_push {
+			s := r.read_slice(line)?
+			return s
+		}
+		proto.resp_map {
+			m := r.read_map(line)?
+			return m
+		}
 		else {
 			return error('redis: can\'t parse $line')
 		}
 	}
 }
 
-fn (mut r Reader) read_map(line string) ?map[string]string {
+fn (mut r Reader) read_map(line string) ?map[voidptr]Any {
 	n := r.reply_len(line)?
 
-	mut m := map[string]string{}
+	mut m := map[voidptr]Any{}
 	for i := 0; i < n; i++ {
 		k := r.read_reply()?
 		v := r.read_reply() or {
-			/*
-			if err is RedisError {
-				if err == proto.nil_value {
-					Empty(0)
-				} else {
-					err
-				}
-			} else {
-				panic(err)
-			}*/
-			return err
+			if err.msg() != proto.nil_value.msg() {
+				return err
+			}
+
+			Empty(0)
 		}
-		m[k] = v
+		m[&k] = v
 	}
 	return m
 }
 
-fn (mut r Reader) read_slice(line string) ?[]string {
+fn (mut r Reader) read_slice(line string) ?[]Any {
 	n := r.reply_len(line)?
 
-	mut val := []string{len: n, init: ''}
+	mut val := []Any{len: n, init: Empty(0)}
 	for i := 0; i < n; i++ {
 		v := r.read_reply() or {
-			/*
-			if err is RedisError {
-				if err == proto.nil_value {
-					Empty(0)
-				} else {
-					new_redis_error(err.msg())
-				}
-			} else {
-				panic(err)
+			if err.msg() != proto.nil_value.msg() {
+				return err
 			}
-			*/
-			return err
+
+			Empty(0)
 		}
 		val[i] = v
 	}

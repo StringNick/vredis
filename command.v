@@ -3,7 +3,6 @@ module vredis
 import proto
 
 interface Cmder {
-	value() string
 	name() string
 	full_name() string
 	args() []string
@@ -13,7 +12,7 @@ interface Cmder {
 	first_key_pos() i8
 mut:
 	set_err(string)
-	read_reply(mut proto.Reader)?
+	read_reply(mut proto.Reader) ?
 }
 
 struct BaseCmd {
@@ -77,7 +76,7 @@ pub fn (cmd BaseCmd) err() string {
 pub struct Cmd {
 	BaseCmd
 mut:
-	val string
+	val proto.Any
 }
 
 pub fn new_cmd(args ...string) &Cmd {
@@ -88,7 +87,7 @@ pub fn new_cmd(args ...string) &Cmd {
 	}
 }
 
-pub fn (cmd Cmd) value() string {
+pub fn (cmd Cmd) value() proto.Any {
 	return cmd.val
 }
 
@@ -96,7 +95,7 @@ pub fn (mut cmd Cmd) set_val(val string) {
 	cmd.val = val
 }
 
-pub fn (cmd Cmd) result() ?string {
+pub fn (cmd Cmd) result() ?proto.Any {
 	if cmd.err != '' {
 		return error(cmd.err)
 	}

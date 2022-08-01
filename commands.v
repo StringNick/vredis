@@ -3,6 +3,7 @@ module vredis
 import context
 import time
 import strconv
+import proto
 
 pub const (
 	keep_ttl = -1
@@ -39,10 +40,11 @@ fn format_sec(dur time.Duration) string {
 }
 
 struct Cmdble_ {
-	f fn (mut context.Context, mut Cmder)?
+	f fn (mut context.Context, mut Cmder) ?
 }
 
-pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, expiration time.Duration) &Cmd {
+// set Redis `set key` command
+pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, expiration time.Duration) ! {
 	mut args := []string{len: 3, cap: 5}
 	args[0] = 'set'
 	args[1] = key
@@ -59,20 +61,94 @@ pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, ex
 
 	mut cmd := new_cmd(...args)
 	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or {
-		cmd.err = err.msg()
+
+	c.f(mut ctx, mut t) or { return err }
+
+	cmd_res := proto.scan_type_string(cmd.val)!
+	if cmd_res != 'OK' {
+		return error(cmd_res)
 	}
-	return cmd
+	return
 }
 
-// get Redis `GET key` command.
-pub fn (mut c Cmdble_) get(mut ctx context.Context, key string) &Cmd {
+// get Redis `GET key` command, return none if empty
+pub fn (mut c Cmdble_) get(mut ctx context.Context, key string) ?string {
 	mut cmd := new_cmd('get', key)
 	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or {
-		println('error arrived $err')
-		cmd.err = err.msg()
+	c.f(mut ctx, mut t) or { return err }
+
+	res := proto.scan_type_string(cmd.val) or { return err }
+
+	return res
+}
+
+// rpush Redis `rpush key [values...]` return llen of key
+pub fn (mut c Cmdble_) rpush(mut ctx context.Context, key string, values ...string) ?i64 {
+	mut args := []string{len: 2, cap: 2 + values.len}
+	args[0] = 'rpush'
+	args[1] = key
+	args << values
+
+	mut cmd := new_cmd(...args)
+	mut t := Cmder(cmd)
+	c.f(mut ctx, mut t) or { return err }
+
+	res := proto.scan_type_int(cmd.val) or { return err }
+
+	return res
+}
+
+// rpush Redis `lpush key [values...]` return llen of key
+pub fn (mut c Cmdble_) lpush(mut ctx context.Context, key string, values ...string) ?i64 {
+	mut args := []string{len: 2, cap: 2 + values.len}
+	args[0] = 'lpush'
+	args[1] = key
+	args << values
+
+	mut cmd := new_cmd(...args)
+	mut t := Cmder(cmd)
+	c.f(mut ctx, mut t) or { return err }
+
+	res := proto.scan_type_int(cmd.val) or { return err }
+
+	return res
+}
+
+// lrange Redis `lrange key start stop` return slice or err
+pub fn (mut c Cmdble_) lrange(mut ctx context.Context, key string, start i64, stop i64) ?[]string {
+	mut cmd := new_cmd('lrange', key, strconv.format_int(start, 10), strconv.format_int(stop,
+		10))
+	mut t := Cmder(cmd)
+	c.f(mut ctx, mut t) or { return err }
+
+	res := proto.scan_type_string_slice(cmd.val) or { return err }
+
+	return res
+}
+
+// flushall Redis command `flushall`, sync by default
+pub fn (mut c Cmdble_) flushall(mut ctx context.Context) ! {
+	mut cmd := new_cmd('flushall')
+	mut t := Cmder(cmd)
+	c.f(mut ctx, mut t) or { return err }
+	cmd_res := proto.scan_type_string(cmd.val)!
+
+	if cmd_res != 'OK' {
+		return error('wrong response: $cmd_res')
 	}
-	
-	return cmd
+}
+
+// del Redis `del keys...` return count of deleted
+pub fn (mut c Cmdble_) del(mut ctx context.Context, keys ...string) ?i64 {
+	mut args := []string{cap: keys.len + 1}
+	args << 'del'
+	args << keys
+
+	mut cmd := new_cmd(...args)
+	mut t := Cmder(cmd)
+	c.f(mut ctx, mut t) or { return err }
+
+	res := proto.scan_type_int(cmd.val) or { return err }
+
+	return res
 }

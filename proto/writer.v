@@ -43,9 +43,9 @@ fn (mut w Writer) write_len(n int) ? {
 pub fn (mut w Writer) write_arg(v string) ? {
 	// TODO: different argument write
 	w.string(v)?
-	return
 	// TODO: encoding binary marshaller
-	//return error('redis: can\'t marshal $v (implement encoding.BinaryMarshaler)')
+	// return error('redis: can\'t marshal $v (implement encoding.BinaryMarshaler)')
+	return
 }
 
 fn (mut w Writer) string(s string) ? {

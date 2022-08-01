@@ -29,7 +29,7 @@ pub fn new_client(mut opt Options) &Client {
 			f: b.process
 		}
 	}
-	
+
 	return c
 }
 
@@ -58,8 +58,8 @@ fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
 	return cn
 }
 
-fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback)? {
-	mut cn := c.get_conn(mut ctx) or {return err}
+fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
+	mut cn := c.get_conn(mut ctx) or { return err }
 	mut last_err := IError(none)
 	defer {
 		c.release_conn(ctx, mut cn, last_err)
@@ -81,7 +81,7 @@ fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback)? {
 
 	d := chan IError{}
 	eprintln('with_conn: try to go spawn')
-	go fn (d chan IError, ctx context.Context, mut cn &pool.Conn, f ConnCallback) {
+	go fn (d chan IError, ctx context.Context, mut cn pool.Conn, f ConnCallback) {
 		f(ctx, mut cn) or {
 			d <- err
 			return
@@ -113,7 +113,7 @@ fn (mut c BaseClient) process(mut ctx context.Context, mut cmd Cmder) ? {
 		retry := c.process_(mut ctx, mut cmd, attempt) or {
 			last_err = err
 			// TODO: second bool param
-			
+
 			if should_retry(err, false) {
 				continue
 			}
@@ -138,12 +138,12 @@ fn (mut c BaseClient) process_(mut ctx context.Context, mut cmd Cmder, attempt i
 	// retry_timeout := u32(1)
 	c.with_conn(mut ctx, fn [mut c, mut cmd] (ctx context.Context, mut cn pool.Conn) ? {
 		eprintln('with conn anon fn')
-		mut wr := cn.with_writer(ctx, c.opt.write_timeout) ?
+		mut wr := cn.with_writer(ctx, c.opt.write_timeout)?
 		write_cmd(mut wr, cmd)?
 
 		// io.new_buffered_reader({reader: io.make_reader(con)})
 		// TODO: custom timeout for read
-		
+
 		mut rd := cn.with_reader(ctx, c.opt.read_timeout)?
 		cmd.read_reply(mut rd)?
 		return
