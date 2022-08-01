@@ -18,7 +18,7 @@ import context
 interface Pipeliner {
 	len() int
 	do(context.Context, ...string) &Cmd
-	process(context.Context, Cmder) ?
+	process(context.Context, &Cmd) ?
 	discard()
-	exec(context.Context) ?[]Cmder
+	exec(context.Context) ?[]&Cmd
 }

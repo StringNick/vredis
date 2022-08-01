@@ -40,7 +40,7 @@ fn format_sec(dur time.Duration) string {
 }
 
 struct Cmdble_ {
-	f fn (mut context.Context, mut Cmder) ?
+	f fn (mut context.Context, mut Cmd) ?
 }
 
 // set Redis `set key` command
@@ -60,9 +60,8 @@ pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, ex
 	}
 
 	mut cmd := new_cmd(...args)
-	mut t := Cmder(cmd)
 
-	c.f(mut ctx, mut t) or { return err }
+	c.f(mut ctx, mut cmd) or { return err }
 
 	cmd_res := proto.scan_type_string(cmd.val)!
 	if cmd_res != 'OK' {
@@ -74,8 +73,7 @@ pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, ex
 // get Redis `GET key` command, return none if empty
 pub fn (mut c Cmdble_) get(mut ctx context.Context, key string) ?string {
 	mut cmd := new_cmd('get', key)
-	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or { return err }
+	c.f(mut ctx, mut cmd) or { return err }
 
 	res := proto.scan_type_string(cmd.val) or { return err }
 
@@ -90,8 +88,7 @@ pub fn (mut c Cmdble_) rpush(mut ctx context.Context, key string, values ...stri
 	args << values
 
 	mut cmd := new_cmd(...args)
-	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or { return err }
+	c.f(mut ctx, mut cmd) or { return err }
 
 	res := proto.scan_type_int(cmd.val) or { return err }
 
@@ -106,8 +103,7 @@ pub fn (mut c Cmdble_) lpush(mut ctx context.Context, key string, values ...stri
 	args << values
 
 	mut cmd := new_cmd(...args)
-	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or { return err }
+	c.f(mut ctx, mut cmd) or { return err }
 
 	res := proto.scan_type_int(cmd.val) or { return err }
 
@@ -118,8 +114,7 @@ pub fn (mut c Cmdble_) lpush(mut ctx context.Context, key string, values ...stri
 pub fn (mut c Cmdble_) lrange(mut ctx context.Context, key string, start i64, stop i64) ?[]string {
 	mut cmd := new_cmd('lrange', key, strconv.format_int(start, 10), strconv.format_int(stop,
 		10))
-	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or { return err }
+	c.f(mut ctx, mut cmd) or { return err }
 
 	res := proto.scan_type_string_slice(cmd.val) or { return err }
 
@@ -129,8 +124,7 @@ pub fn (mut c Cmdble_) lrange(mut ctx context.Context, key string, start i64, st
 // flushall Redis command `flushall`, sync by default
 pub fn (mut c Cmdble_) flushall(mut ctx context.Context) ! {
 	mut cmd := new_cmd('flushall')
-	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or { return err }
+	c.f(mut ctx, mut cmd) or { return err }
 	cmd_res := proto.scan_type_string(cmd.val)!
 
 	if cmd_res != 'OK' {
@@ -145,8 +139,7 @@ pub fn (mut c Cmdble_) del(mut ctx context.Context, keys ...string) ?i64 {
 	args << keys
 
 	mut cmd := new_cmd(...args)
-	mut t := Cmder(cmd)
-	c.f(mut ctx, mut t) or { return err }
+	c.f(mut ctx, mut cmd) or { return err }
 
 	res := proto.scan_type_int(cmd.val) or { return err }
 

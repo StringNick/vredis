@@ -2,19 +2,6 @@ module vredis
 
 import proto
 
-interface Cmder {
-	name() string
-	full_name() string
-	args() []string
-	err() string
-	// TODO: private methods below
-	arg(int) string
-	first_key_pos() i8
-mut:
-	set_err(string)
-	read_reply(mut proto.Reader) ?
-}
-
 struct BaseCmd {
 mut:
 	args    []string
@@ -107,7 +94,7 @@ fn (mut cmd Cmd) read_reply(mut rd proto.Reader) ? {
 	cmd.val = rd.read_reply()?
 }
 
-fn write_cmd(mut wr proto.Writer, cmd Cmder) ? {
+fn write_cmd(mut wr proto.Writer, cmd Cmd) ? {
 	eprintln('write_cmd: $cmd')
 	return wr.write_args(cmd.args())
 }

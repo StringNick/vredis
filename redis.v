@@ -104,7 +104,7 @@ fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
 	return
 }
 
-fn (mut c BaseClient) process(mut ctx context.Context, mut cmd Cmder) ? {
+fn (mut c BaseClient) process(mut ctx context.Context, mut cmd Cmd) ? {
 	mut last_err := IError(none)
 
 	println('process: start processing')
@@ -129,7 +129,7 @@ fn (mut c BaseClient) process(mut ctx context.Context, mut cmd Cmder) ? {
 	return last_err
 }
 
-fn (mut c BaseClient) process_(mut ctx context.Context, mut cmd Cmder, attempt int) ?bool {
+fn (mut c BaseClient) process_(mut ctx context.Context, mut cmd Cmd, attempt int) ?bool {
 	if attempt > 0 {
 		// TODO: timeoutry
 	}
