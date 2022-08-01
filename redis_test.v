@@ -31,7 +31,8 @@ fn test_get_set() ? {
 	assert del_count == 1
 }
 
-fn test_lpush_lrange(mut ctx context.Context, mut cl Client) ? {
+fn test_lpush_lrange() ? {
+	mut ctx, mut cl := setup()?
 	key, val, val1 := 'test_list', 'val', 'val1'
 
 	push_count := cl.rpush(mut ctx, key, val, val1)?

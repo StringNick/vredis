@@ -4,7 +4,7 @@ import context
 import pool
 import proto
 
-const (
+pub const (
 	nil_value = proto.nil_value
 )
 

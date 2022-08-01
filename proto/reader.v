@@ -28,7 +28,7 @@ const (
 // Streamed           = "EOF:"
 // StreamedAggregated = '?'
 
-const nil_value = error('redis: nil')
+pub const nil_value = error('redis: nil')
 
 struct RedisError {
 	code int
