@@ -25,7 +25,7 @@ mut:
 
 pub struct ConnPool {
 mut:
-	conns_mu sync.Mutex // mutex
+	conns_mu &sync.Mutex // mutex
 
 	opt Options
 
@@ -62,12 +62,16 @@ pub fn new_conn_pool(opt Options) &ConnPool {
 		conns: []Conn{cap: opt.pool_size}
 		idle_conns: []Conn{cap: opt.pool_size}
 		closed_ch: chan bool{}
+		conns_mu: sync.new_mutex()
 	}
 
 	p.conns_mu.init()
+	addr := voidptr(p.conns_mu)
+	println('lock1 $addr')
 	p.conns_mu.@lock()
 
 	p.check_min_idle_conns()
+	println('unlock')
 	p.conns_mu.unlock()
 
 	return p
@@ -84,28 +88,36 @@ fn (mut p ConnPool) check_min_idle_conns() {
 		p.pool_size++
 		p.idle_conns_len++
 
-		go fn [mut p] () {
+		go fn (mut p ConnPool) {
+			println('qqqq privet1')
 			p.add_idle_conn() or {
+				println('qqq')
 				if err != pool.err_closed {
+					println('lock2')
 					p.conns_mu.@lock()
 
 					p.pool_size--
 					p.idle_conns_len--
+					println('unlock')
 					p.conns_mu.unlock()
 				}
+				println('qqqq end1')
+
 				return
 			}
-		}()
+				println('qqqq end1')
+		}(mut p)
 	}
 }
 
 fn (mut p ConnPool) add_idle_conn() ? {
-	println('add_idle_conn')
+	println('add_idle_conn: start')
 	mut cn := p.dial_conn(context.todo(), true)?
-
+	println('lock')
 	p.conns_mu.@lock()
 
 	defer {
+		println('unlock')
 		p.conns_mu.unlock()
 	}
 
@@ -114,6 +126,7 @@ fn (mut p ConnPool) add_idle_conn() ? {
 		return pool.err_closed
 	}
 
+	println('add_idle_conn: successfully added new connection')
 	p.conns << cn
 	p.idle_conns << cn
 }
@@ -184,9 +197,11 @@ fn (mut p ConnPool) new_conn_(ctx context.Context, pooled bool) ?Conn {
 	println('new_conn_: new conn initiated')
 	mut cn := p.dial_conn(ctx, pooled)?
 	println('new_conn_: dialed new conn')
+	println('lock')
 	p.conns_mu.@lock()
 
 	defer {
+		println('unlock')
 		p.conns_mu.unlock()
 	}
 
@@ -221,11 +236,13 @@ pub fn (mut p ConnPool) get(mut ctx context.Context) ?Conn {
 	}
 
 	p.wait_turn(mut ctx)?
-
+	println('pool_conn: waited turn')
 	for {
 		//	time.sleep(time.second)
+		println('lock')
 		p.conns_mu.@lock()
 		mut cn := p.pop_idle(ctx) or {
+			println('unlock')
 			p.conns_mu.unlock()
 			if err == error('pop_idle: empty') {
 				println('get: break and trying new conn')
@@ -234,7 +251,9 @@ pub fn (mut p ConnPool) get(mut ctx context.Context) ?Conn {
 			println('get: pop_idle return err $err')
 			return err
 		}
+		println('unlock')
 		p.conns_mu.unlock()
+		println('successfully poped connection')
 		/*
 		TODO: isHealthy
 		if p.is_stale_conn(mut cn) {
@@ -280,7 +299,7 @@ fn (mut p ConnPool) pop_idle(ctx context.Context) ?Conn {
 	if p.closed() {
 		return pool.err_closed
 	}
-	println('pop_idle: init')
+	println('pop_idle: init $p.idle_conns.len')
 	n := p.idle_conns.len
 	if n == 0 {
 		println('pop_idle: empty')
@@ -305,13 +324,19 @@ fn (mut p ConnPool) pop_idle(ctx context.Context) ?Conn {
 
 pub fn (mut p ConnPool) put(ctx context.Context, mut cn Conn) {
 	// TODO: check bufferred content pool/pool
+	println("put: init $cn.pooled")
 	if !cn.pooled {
 		p.remove(ctx, mut cn, none)
 		return
 	}
 
-	p.conns_mu.@lock()
+	addr := voidptr(p)
+	println('lock1 $addr')
 
+	p.conns_mu.@lock()
+	println('locked')
+	l := p.idle_conns.len
+	println("put: idle_conns len $l")
 	p.idle_conns << cn
 	p.idle_conns_len++
 	p.conns_mu.unlock()
@@ -331,9 +356,11 @@ pub fn (mut p ConnPool) close_conn(mut cn Conn) ? {
 }
 
 fn (mut p ConnPool) remove_conn_with_lock(cn Conn) {
+	println('lock')
 	p.conns_mu.@lock()
 
 	p.remove_conn(cn)
+	println('unlock')
 	p.conns_mu.unlock()
 }
 
@@ -355,27 +382,33 @@ fn (mut p ConnPool) close_conn_(mut cn Conn) ? {
 }
 
 pub fn (mut p ConnPool) len() int {
+	println('lock')
 	p.conns_mu.@lock()
 
 	n := p.conns.len
+	println('unlock')
 	p.conns_mu.unlock()
 
 	return n
 }
 
 pub fn (mut p ConnPool) idle_len() int {
+	println('lock')
 	p.conns_mu.@lock()
 
 	n := p.idle_conns_len
+	println('unlock')
 	p.conns_mu.unlock()
 
 	return n
 }
 
 pub fn (mut p ConnPool) filter(f fn (Conn) bool) ? {
+	println('lock')
 	p.conns_mu.@lock()
 
 	defer {
+		println('unlock')
 		p.conns_mu.unlock()
 	}
 
@@ -405,6 +438,7 @@ pub fn (mut p ConnPool) close() ? {
 	p.closed_ch.close()
 
 	mut first_err := IError(none)
+	println('lock')
 	p.conns_mu.@lock()
 
 	for i := 0; i < p.conns.len; i++ {
@@ -420,6 +454,7 @@ pub fn (mut p ConnPool) close() ? {
 	p.pool_size = 0
 	p.idle_conns = []Conn{}
 	p.idle_conns_len = 0
+	println('unlock')
 	p.conns_mu.unlock()
 
 	return first_err

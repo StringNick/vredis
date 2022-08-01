@@ -22,7 +22,8 @@ pub struct Client {
 
 pub fn new_client(mut opt Options) &Client {
 	opt.init()
-	b := new_base_client(opt, new_conn_pool(opt))
+	pool := new_conn_pool(opt)
+	b := new_base_client(opt, pool)
 	mut c := &Client{
 		BaseClient: b
 		Cmdble_: Cmdble_{
@@ -43,50 +44,75 @@ fn new_base_client(opt Options, pool pool.Pooler) &BaseClient {
 type ConnCallback = fn (context.Context, mut pool.Conn) ?
 
 fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
+//	c.debug_pool()
 	println('get_conn: starting get conn')
+	c.debug_pool()
+
 	mut cn := c.conn_pool.get(mut ctx)?
+	println('get_conn: got connect from pool')
+	c.debug_pool()
 
 	if cn.inited {
 		return cn
 	}
 
-	c.init_conn(ctx, mut cn) or {
+	println('get_conn: init_conn')
+	c.debug_pool()
+	/*c.init_conn(ctx, mut cn) or {
+		println('get_conn: err remove $err')
 		c.conn_pool.remove(ctx, mut cn, err)
 		return err
-	}
+	}*/
+	println('get_conn: init_conn_after')
+	c.debug_pool()
+
 
 	return cn
 }
 
 fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
+	println('with_conn: init')
+	c.debug_pool()
+
 	mut cn := c.get_conn(mut ctx) or { return err }
 	mut last_err := IError(none)
+	println('with_conn: get connect successfull')
+	c.debug_pool()
 	defer {
-		c.release_conn(ctx, mut cn, last_err)
+		println('with_conn: releasing connection')
+		c.debug_pool()
+
+		c.release_conn(ctx, mut cn, error('123'))
 	}
 	// TODO: remove after fix
 	done := ctx.done()
 	eprintln('with_conn: started with conn')
 
-	select {
-		_ := <-done {
-			eprintln('with_conn: done callback')
-		}
-		else {
+	match ctx {
+		context.EmptyContext {
 			eprintln('with_conn: turning conn')
-			f(ctx, mut cn) or { last_err = err }
-			return last_err
+			f(ctx, mut cn) or { 
+				last_err = err
+				return err
+			}
+			println('with_conn: successfully executed')
+			c.debug_pool()
+			return
+		} else {
+			
 		}
 	}
 
 	d := chan IError{}
 	eprintln('with_conn: try to go spawn')
 	go fn (d chan IError, ctx context.Context, mut cn pool.Conn, f ConnCallback) {
+		println('qqqq privet')
 		f(ctx, mut cn) or {
 			d <- err
 			return
 		}
 		d <- IError(none)
+		println('qqqq end')
 	}(d, ctx, mut &cn, f)
 
 	select {
@@ -156,7 +182,19 @@ fn (mut c BaseClient) process_(mut ctx context.Context, mut cmd Cmd, attempt int
 	return false
 }
 
+fn (c BaseClient) debug_pool() {
+	pl := c.conn_pool
+	if pl is pool.ConnPool {
+		addr := voidptr(pl as &pool.ConnPool)
+			println('debug pool address $addr')
+	}
+}
+
 fn (mut c BaseClient) release_conn(ctx context.Context, mut cn pool.Conn, err IError) {
+	println('release connection')
+    
+	c.debug_pool()
+	
 	c.conn_pool.put(ctx, mut cn)
 
 	/*
@@ -167,19 +205,21 @@ fn (mut c BaseClient) release_conn(ctx context.Context, mut cn pool.Conn, err IE
 	}*/
 }
 
-fn (mut c BaseClient) init_conn(ctx context.Context, mut cn pool.Conn) ? {
+fn (c BaseClient) init_conn(ctx context.Context, mut cn pool.Conn) ? {
 	println('init_conn: pooled=$cn.inited')
+	c.debug_pool()
 	if cn.inited {
 		return
 	}
 
 	cn.inited = true
 	println('init_conn: new_signle_pool_conn')
-	mut conn_pool := pool.new_single_pool_conn(c.conn_pool, cn)
-	_ = new_conn(c.opt, conn_pool)
-
+	c.debug_pool()
+	//mut conn_pool := pool.new_single_pool_conn(c.conn_pool, cn)
+//	_ = new_conn(c.opt, conn_pool)
+	println('init_conn: new_conn')
+	c.debug_pool()
 	// TODO: pipeliner
-	return
 }
 
 /*

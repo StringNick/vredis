@@ -6,10 +6,12 @@ import time
 fn setup() ?(context.Context, &Client) {
 	mut opt := Options{
 		addr: 'localhost:6379'
+		min_idle_conns: 1
 	}
 
 	mut cl := new_client(mut opt)
 	mut ctx := context.todo()
+	time.sleep(time.second * 5)
 
 	return ctx, cl
 }
