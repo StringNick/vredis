@@ -59,11 +59,11 @@ fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
 
 	println('get_conn: init_conn')
 	c.debug_pool()
-	/*c.init_conn(ctx, mut cn) or {
+	c.init_conn(ctx, mut cn) or {
 		println('get_conn: err remove $err')
 		c.conn_pool.remove(ctx, mut cn, err)
 		return err
-	}*/
+	}
 	println('get_conn: init_conn_after')
 	c.debug_pool()
 
