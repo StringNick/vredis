@@ -6,8 +6,8 @@ for startup redis:
 
 run test:
 
-    v test .
+    v -enable-globals test .
 
 run test with logs:
 
-    v -stats test .
+    v -stats -enable-globals test .
