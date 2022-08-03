@@ -68,6 +68,4 @@ fn test_read_line() {
 	mut rd := new_reader(buf)
 	str := rd.read_line() or { panic(err) }
 	assert is_equal(b[..b.len - 2], str.bytes())
-
-	// print('str $str and b $b')
 }

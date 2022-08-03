@@ -80,6 +80,8 @@ pub fn parse_url(redis_url string) ?Options {
 fn (mut o Options) init() {
 	o.dialer = fn (ctx context.Context, addr string) ?&net.TcpConn {
 		// TODO: dial timeout
+
+
 		return net.dial_tcp(addr)
 	}
 }

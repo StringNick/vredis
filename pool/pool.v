@@ -25,7 +25,7 @@ mut:
 
 pub struct ConnPool {
 mut:
-	conns_mu sync.Mutex // mutex
+	conns_mu &sync.Mutex // mutex
 
 	opt Options
 
@@ -62,11 +62,11 @@ pub fn new_conn_pool(opt Options) &ConnPool {
 		conns: []Conn{cap: opt.pool_size}
 		idle_conns: []Conn{cap: opt.pool_size}
 		closed_ch: chan bool{}
+		conns_mu: sync.new_mutex()
 	}
 
 	p.conns_mu.init()
 	p.conns_mu.@lock()
-
 	p.check_min_idle_conns()
 	p.conns_mu.unlock()
 
@@ -84,7 +84,7 @@ fn (mut p ConnPool) check_min_idle_conns() {
 		p.pool_size++
 		p.idle_conns_len++
 
-		go fn [mut p] () {
+		go fn (mut p ConnPool) {
 			p.add_idle_conn() or {
 				if err != pool.err_closed {
 					p.conns_mu.@lock()
@@ -93,16 +93,16 @@ fn (mut p ConnPool) check_min_idle_conns() {
 					p.idle_conns_len--
 					p.conns_mu.unlock()
 				}
+
 				return
 			}
-		}()
+		}(mut p)
 	}
 }
 
 fn (mut p ConnPool) add_idle_conn() ? {
-	println('add_idle_conn')
+	println('add_idle_conn: start')
 	mut cn := p.dial_conn(context.todo(), true)?
-
 	p.conns_mu.@lock()
 
 	defer {
@@ -114,6 +114,7 @@ fn (mut p ConnPool) add_idle_conn() ? {
 		return pool.err_closed
 	}
 
+	println('add_idle_conn: successfully added new connection')
 	p.conns << cn
 	p.idle_conns << cn
 }
@@ -123,18 +124,16 @@ fn (mut c ConnPool) dial_conn(ctx context.Context, pooled bool) ?Conn {
 	if c.closed() {
 		return pool.err_closed
 	}
-	println('dialin connect123')
 	c.conns_mu.@lock()
-	println('dialin connect1')
 	mut dial_errors_num := c.dial_errors_num
 	c.conns_mu.unlock()
 	if dial_errors_num > u64(c.opt.pool_size) {
 		return c.last_dial_error
 	}
-	println('dialin connect2')
 
 	net_conn := c.opt.dialer(ctx) or {
 		println('dial error $err')
+
 		c.conns_mu.@lock()
 		c.last_dial_error = err
 		c.dial_errors_num++
@@ -159,22 +158,19 @@ fn (mut c ConnPool) closed() bool {
 }
 
 fn (mut c ConnPool) try_dial() {
+	println('try_dial: started')
 	for {
 		if c.closed() {
 			return
 		}
 
 		mut conn := c.opt.dialer(context.background()) or {
-			c.conns_mu.@lock()
 			c.last_dial_error = err
-			c.conns_mu.unlock()
 			time.sleep(time.second)
 			continue
 		}
-
-		c.conns_mu.@lock()
-		c.dial_errors_num++
-		c.conns_mu.unlock()
+		
+		stdatomic.store_u64(&c.dial_errors_num, 0)
 		conn.close() or {}
 		return
 	}
@@ -221,7 +217,7 @@ pub fn (mut p ConnPool) get(mut ctx context.Context) ?Conn {
 	}
 
 	p.wait_turn(mut ctx)?
-
+	println('pool_conn: waited turn')
 	for {
 		//	time.sleep(time.second)
 		p.conns_mu.@lock()
@@ -235,6 +231,7 @@ pub fn (mut p ConnPool) get(mut ctx context.Context) ?Conn {
 			return err
 		}
 		p.conns_mu.unlock()
+		println('successfully poped connection')
 		/*
 		TODO: isHealthy
 		if p.is_stale_conn(mut cn) {
@@ -280,7 +277,7 @@ fn (mut p ConnPool) pop_idle(ctx context.Context) ?Conn {
 	if p.closed() {
 		return pool.err_closed
 	}
-	println('pop_idle: init')
+	println('pop_idle: init $p.idle_conns.len')
 	n := p.idle_conns.len
 	if n == 0 {
 		println('pop_idle: empty')
@@ -305,13 +302,19 @@ fn (mut p ConnPool) pop_idle(ctx context.Context) ?Conn {
 
 pub fn (mut p ConnPool) put(ctx context.Context, mut cn Conn) {
 	// TODO: check bufferred content pool/pool
+	println("put: init $cn.pooled")
 	if !cn.pooled {
 		p.remove(ctx, mut cn, none)
 		return
 	}
 
-	p.conns_mu.@lock()
+	addr := voidptr(p)
+	println('lock1 $addr')
 
+	p.conns_mu.@lock()
+	println('locked')
+	l := p.idle_conns.len
+	println("put: idle_conns len $l")
 	p.idle_conns << cn
 	p.idle_conns_len++
 	p.conns_mu.unlock()

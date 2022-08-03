@@ -3,24 +3,28 @@ module vredis
 import context
 import time
 
-fn setup() ?(context.Context, &Client) {
+__global (
+	cl = setup()
+)
+
+fn setup() &Client {
 	mut opt := Options{
 		addr: 'localhost:6379'
+		min_idle_conns: 3
 	}
 
 	mut cl := new_client(mut opt)
-	mut ctx := context.todo()
-
-	return ctx, cl
+	time.sleep(time.second)
+	return cl
 }
 
 fn test_get_set() ? {
-	mut ctx, mut cl := setup()?
+	mut ctx := context.todo()
 	val := 'bar'
 	key := 'test_key'
 
 	cl.set(mut ctx, key, val, time.hour) or {
-		println('err $err')
+		println('redis_test: $err')
 		return err
 	}
 
@@ -32,7 +36,7 @@ fn test_get_set() ? {
 }
 
 fn test_lpush_lrange() ? {
-	mut ctx, mut cl := setup()?
+	mut ctx := context.todo()
 	key, val, val1 := 'test_list', 'val', 'val1'
 
 	push_count := cl.rpush(mut ctx, key, val, val1)?
@@ -48,7 +52,7 @@ fn test_lpush_lrange() ? {
 }
 
 fn test_flushall() ? {
-	mut ctx, mut cl := setup()?
+	mut ctx := context.todo()
 	val := 'bar'
 	key := 'test_key'
 
