@@ -1,6 +1,7 @@
 module vredis
 
 import context
+import strconv
 import time
 
 __global (
@@ -9,13 +10,41 @@ __global (
 
 fn setup() &Client {
 	mut opt := Options{
-		addr: 'localhost:6379'
-		min_idle_conns: 3
+		addr: '127.0.0.1:6379'
+		min_idle_conns: 50
+		pool_size: 50
 	}
 
 	mut cl := new_client(mut opt)
-	time.sleep(time.second)
+	time.sleep(5 * time.second)
 	return cl
+}
+
+
+fn multithread_rpush(key string, i i64){
+	mut ctx := context.todo()
+
+	val := strconv.format_int(i, 10)
+	println('[thread#$val] rpush init..')
+	cl.rpush(mut ctx, key, val) or {
+		println('[thread#$val] rpush error $err')
+	}
+}
+
+fn test_multithreading() ? {
+	mut ctx := context.todo()
+
+	count := 10
+	key := 'test_list_thread'
+	mut threads := []thread{}
+	for i := 0; i < count; i ++ {
+		threads << go multithread_rpush(key, i64(i))
+	}
+	threads.wait()
+
+	lrange := cl.lrange(mut ctx, key, 0, -1) or { return err }
+	assert lrange.len == count
+	println('waited')
 }
 
 fn test_get_set() ? {

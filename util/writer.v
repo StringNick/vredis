@@ -15,6 +15,5 @@ pub fn new_tcp_writer(conn &net.TcpConn) &TcpWriter {
 pub fn (mut w TcpWriter) write_byte(b u8) ? {
 	bt := [b]
 
-	println('write byte $bt.bytestr()')
 	w.write(bt)?
 }

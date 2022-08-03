@@ -95,6 +95,5 @@ fn (mut cmd Cmd) read_reply(mut rd proto.Reader) ? {
 }
 
 fn write_cmd(mut wr proto.Writer, cmd Cmd) ? {
-	eprintln('write_cmd: $cmd')
 	return wr.write_args(cmd.args())
 }

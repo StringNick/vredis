@@ -167,3 +167,5 @@ pub fn (mut c Cmdble_) rpop(mut ctx context.Context, key string) ?string {
 	res := proto.scan_type_string(cmd.val) or {return err}
 	return res
 }
+
+// append, expire,
