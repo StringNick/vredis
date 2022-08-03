@@ -51,6 +51,20 @@ fn test_lpush_lrange() ? {
 	assert del_count == 1
 }
 
+fn test_lpop() ? {
+	mut ctx := context.todo()
+	key, val, val1 := 'test_list', 'val', 'val1'
+
+	push_count := cl.rpush(mut ctx, key, val, val1)?
+	assert push_count == 2
+
+	res := cl.lpop(mut ctx, key)?
+	assert res == val
+
+	del_count := cl.del(mut ctx, key)?
+	assert del_count == 1
+}
+
 fn test_flushall() ? {
 	mut ctx := context.todo()
 	val := 'bar'

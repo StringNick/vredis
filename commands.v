@@ -145,3 +145,14 @@ pub fn (mut c Cmdble_) del(mut ctx context.Context, keys ...string) ?i64 {
 
 	return res
 }
+
+// lpop Redis `lpop key` return string or err
+pub fn (mut c Cmdble_) lpop(mut ctx context.Context, key string) ?string {
+	mut cmd := new_cmd('lpop', key)
+	c.f(mut ctx, mut cmd) or {
+		return err
+	}
+
+	res := proto.scan_type_string(cmd.val) or {return err}
+	return res
+}
