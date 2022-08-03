@@ -66,12 +66,8 @@ pub fn new_conn_pool(opt Options) &ConnPool {
 	}
 
 	p.conns_mu.init()
-	addr := voidptr(p.conns_mu)
-	println('lock1 $addr')
 	p.conns_mu.@lock()
-
 	p.check_min_idle_conns()
-	println('unlock')
 	p.conns_mu.unlock()
 
 	return p
@@ -89,23 +85,17 @@ fn (mut p ConnPool) check_min_idle_conns() {
 		p.idle_conns_len++
 
 		go fn (mut p ConnPool) {
-			println('qqqq privet1')
 			p.add_idle_conn() or {
-				println('qqq')
 				if err != pool.err_closed {
-					println('lock2')
 					p.conns_mu.@lock()
 
 					p.pool_size--
 					p.idle_conns_len--
-					println('unlock')
 					p.conns_mu.unlock()
 				}
-				println('qqqq end1')
 
 				return
 			}
-				println('qqqq end1')
 		}(mut p)
 	}
 }
@@ -113,11 +103,9 @@ fn (mut p ConnPool) check_min_idle_conns() {
 fn (mut p ConnPool) add_idle_conn() ? {
 	println('add_idle_conn: start')
 	mut cn := p.dial_conn(context.todo(), true)?
-	println('lock')
 	p.conns_mu.@lock()
 
 	defer {
-		println('unlock')
 		p.conns_mu.unlock()
 	}
 
@@ -136,18 +124,16 @@ fn (mut c ConnPool) dial_conn(ctx context.Context, pooled bool) ?Conn {
 	if c.closed() {
 		return pool.err_closed
 	}
-	println('dialin connect123')
 	c.conns_mu.@lock()
-	println('dialin connect1')
 	mut dial_errors_num := c.dial_errors_num
 	c.conns_mu.unlock()
 	if dial_errors_num > u64(c.opt.pool_size) {
 		return c.last_dial_error
 	}
-	println('dialin connect2')
 
 	net_conn := c.opt.dialer(ctx) or {
 		println('dial error $err')
+
 		c.conns_mu.@lock()
 		c.last_dial_error = err
 		c.dial_errors_num++
@@ -172,22 +158,19 @@ fn (mut c ConnPool) closed() bool {
 }
 
 fn (mut c ConnPool) try_dial() {
+	println('try_dial: started')
 	for {
 		if c.closed() {
 			return
 		}
 
 		mut conn := c.opt.dialer(context.background()) or {
-			c.conns_mu.@lock()
 			c.last_dial_error = err
-			c.conns_mu.unlock()
 			time.sleep(time.second)
 			continue
 		}
-
-		c.conns_mu.@lock()
-		c.dial_errors_num++
-		c.conns_mu.unlock()
+		
+		stdatomic.store_u64(&c.dial_errors_num, 0)
 		conn.close() or {}
 		return
 	}
@@ -197,11 +180,9 @@ fn (mut p ConnPool) new_conn_(ctx context.Context, pooled bool) ?Conn {
 	println('new_conn_: new conn initiated')
 	mut cn := p.dial_conn(ctx, pooled)?
 	println('new_conn_: dialed new conn')
-	println('lock')
 	p.conns_mu.@lock()
 
 	defer {
-		println('unlock')
 		p.conns_mu.unlock()
 	}
 
@@ -239,10 +220,8 @@ pub fn (mut p ConnPool) get(mut ctx context.Context) ?Conn {
 	println('pool_conn: waited turn')
 	for {
 		//	time.sleep(time.second)
-		println('lock')
 		p.conns_mu.@lock()
 		mut cn := p.pop_idle(ctx) or {
-			println('unlock')
 			p.conns_mu.unlock()
 			if err == error('pop_idle: empty') {
 				println('get: break and trying new conn')
@@ -251,7 +230,6 @@ pub fn (mut p ConnPool) get(mut ctx context.Context) ?Conn {
 			println('get: pop_idle return err $err')
 			return err
 		}
-		println('unlock')
 		p.conns_mu.unlock()
 		println('successfully poped connection')
 		/*
@@ -356,11 +334,9 @@ pub fn (mut p ConnPool) close_conn(mut cn Conn) ? {
 }
 
 fn (mut p ConnPool) remove_conn_with_lock(cn Conn) {
-	println('lock')
 	p.conns_mu.@lock()
 
 	p.remove_conn(cn)
-	println('unlock')
 	p.conns_mu.unlock()
 }
 
@@ -382,33 +358,27 @@ fn (mut p ConnPool) close_conn_(mut cn Conn) ? {
 }
 
 pub fn (mut p ConnPool) len() int {
-	println('lock')
 	p.conns_mu.@lock()
 
 	n := p.conns.len
-	println('unlock')
 	p.conns_mu.unlock()
 
 	return n
 }
 
 pub fn (mut p ConnPool) idle_len() int {
-	println('lock')
 	p.conns_mu.@lock()
 
 	n := p.idle_conns_len
-	println('unlock')
 	p.conns_mu.unlock()
 
 	return n
 }
 
 pub fn (mut p ConnPool) filter(f fn (Conn) bool) ? {
-	println('lock')
 	p.conns_mu.@lock()
 
 	defer {
-		println('unlock')
 		p.conns_mu.unlock()
 	}
 
@@ -438,7 +408,6 @@ pub fn (mut p ConnPool) close() ? {
 	p.closed_ch.close()
 
 	mut first_err := IError(none)
-	println('lock')
 	p.conns_mu.@lock()
 
 	for i := 0; i < p.conns.len; i++ {
@@ -454,7 +423,6 @@ pub fn (mut p ConnPool) close() ? {
 	p.pool_size = 0
 	p.idle_conns = []Conn{}
 	p.idle_conns_len = 0
-	println('unlock')
 	p.conns_mu.unlock()
 
 	return first_err

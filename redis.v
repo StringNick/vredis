@@ -8,7 +8,6 @@ pub const (
 	nil_value = proto.nil_value
 )
 
-[heap]
 struct BaseClient {
 	opt Options
 mut:
@@ -23,11 +22,13 @@ pub struct Client {
 pub fn new_client(mut opt Options) &Client {
 	opt.init()
 	pool := new_conn_pool(opt)
-	b := new_base_client(opt, pool)
+	mut b := new_base_client(opt, pool)
 	mut c := &Client{
 		BaseClient: b
 		Cmdble_: Cmdble_{
-			f: b.process
+			f: fn[mut b] (mut ctx context.Context, mut cmd Cmd) ? {
+				b.process(mut ctx, mut cmd)?
+			}
 		}
 	}
 
@@ -44,7 +45,7 @@ fn new_base_client(opt Options, pool pool.Pooler) &BaseClient {
 type ConnCallback = fn (context.Context, mut pool.Conn) ?
 
 fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
-//	c.debug_pool()
+	c.debug_pool()
 	println('get_conn: starting get conn')
 	c.debug_pool()
 
@@ -104,15 +105,14 @@ fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
 	}
 
 	d := chan IError{}
+	
 	eprintln('with_conn: try to go spawn')
 	go fn (d chan IError, ctx context.Context, mut cn pool.Conn, f ConnCallback) {
-		println('qqqq privet')
 		f(ctx, mut cn) or {
 			d <- err
 			return
 		}
 		d <- IError(none)
-		println('qqqq end')
 	}(d, ctx, mut &cn, f)
 
 	select {
