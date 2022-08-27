@@ -15,12 +15,6 @@ fn use_precise(dur time.Duration) bool {
 
 fn format_ms(dur time.Duration) string {
 	if dur > 0 && dur < time.millisecond {
-		/*
-		internal.Logger.Printf(
-			ctx,
-			"specified duration is %s, but minimal supported value is %s - truncating to 1ms",
-			dur, time.Millisecond,
-		)*/
 		return '1'
 	}
 	return strconv.format_int(dur / time.millisecond, 10)
@@ -28,19 +22,13 @@ fn format_ms(dur time.Duration) string {
 
 fn format_sec(dur time.Duration) string {
 	if dur > 0 && dur < time.second {
-		/*
-		internal.Logger.Printf(
-			ctx,
-			"specified duration is %s, but minimal supported value is %s - truncating to 1s",
-			dur, time.Second,
-		)*/
 		return '1'
 	}
 	return strconv.format_int(dur / time.second, 10)
 }
 
 struct Cmdble_ {
-	f fn (mut context.Context, mut Cmd) ?
+	f fn (mut context.Context, mut Cmd)!
 }
 
 // set Redis `set key` command
@@ -62,8 +50,9 @@ pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, ex
 	mut cmd := new_cmd(...args)
 
 	c.f(mut ctx, mut cmd) or { return err }
-
 	cmd_res := proto.scan_type_string(cmd.val)!
+	result := cmd.val.str()
+	println('cmd res $cmd.val, result $result')
 	if cmd_res != 'OK' {
 		return error(cmd_res)
 	}
@@ -81,16 +70,18 @@ pub fn (mut c Cmdble_) get(mut ctx context.Context, key string) ?string {
 }
 
 // rpush Redis `rpush key [values...]` return llen of key
-pub fn (mut c Cmdble_) rpush(mut ctx context.Context, key string, values ...string) ?i64 {
+pub fn (mut c Cmdble_) rpush(mut ctx context.Context, key string, values ...string) !i64 {
 	mut args := []string{len: 2, cap: 2 + values.len}
 	args[0] = 'rpush'
 	args[1] = key
 	args << values
 
 	mut cmd := new_cmd(...args)
-	c.f(mut ctx, mut cmd) or { return err }
+	c.f(mut ctx, mut cmd)!
 
-	res := proto.scan_type_int(cmd.val) or { return err }
+	print('rpush val $cmd.val')
+
+	res := proto.scan_type_int(cmd.val)!
 
 	return res
 }
@@ -147,7 +138,7 @@ pub fn (mut c Cmdble_) del(mut ctx context.Context, keys ...string) ?i64 {
 }
 
 // lpop Redis `lpop key` return string or err
-pub fn (mut c Cmdble_) lpop(mut ctx context.Context, key string) ?string {
+pub fn (mut c Cmdble_) lpop(mut ctx context.Context, key string) !string {
 	mut cmd := new_cmd('lpop', key)
 	c.f(mut ctx, mut cmd) or {
 		return err

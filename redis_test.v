@@ -17,6 +17,10 @@ fn setup() &Client {
 
 	mut cl := new_client(mut opt)
 	time.sleep(5 * time.second)
+	mut ctx := context.todo()
+	cl.flushall(mut ctx) or {
+		println('flushall error $err')
+	}
 	return cl
 }
 

@@ -4,10 +4,18 @@ const (
 	err_wrong_result_type = error('wrong_result_type')
 )
 
+pub fn scan<T>(v Any) !T {
+	$if T is string {
+		scan_type_string(v)!
+	}
+
+	return err_wrong_result_type
+}
+
 pub fn scan_type_string(v Any) !string {
 	match v {
 		string {
-			return v
+			return string(v)
 		}
 		else {
 			return proto.err_wrong_result_type
@@ -21,6 +29,7 @@ pub fn scan_type_int(v Any) !i64 {
 			return v
 		}
 		else {
+			print('wrong_type $v')
 			return proto.err_wrong_result_type
 		}
 	}

@@ -309,10 +309,8 @@ pub fn (mut p ConnPool) put(ctx context.Context, mut cn Conn) {
 	}
 
 	addr := voidptr(p)
-	println('lock1 $addr')
 
 	p.conns_mu.@lock()
-	println('locked')
 	l := p.idle_conns.len
 	println("put: idle_conns len $l")
 	p.idle_conns << cn

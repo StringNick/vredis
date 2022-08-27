@@ -4,6 +4,7 @@ import io
 import strconv
 import math
 import math.big
+import net
 
 const (
 	resp_status     = u8(`+`) // +<string>\r\n
@@ -58,23 +59,19 @@ pub fn parse_error_reply(line string) RedisError {
 
 pub struct Reader {
 mut:
-	rd &io.BufferedReader
+	rd &net.TcpConn
 	w  int // write and read offset position
 	r  int
 }
 
-pub fn new_reader(rd io.Reader) &Reader {
+pub fn new_reader(rd &net.TcpConn) &Reader {
 	return &Reader{
-		rd: io.new_buffered_reader(io.BufferedReaderConfig{
-			reader: rd
-		})
+		rd: rd
 	}
 }
 
-pub fn (mut r Reader) reset(rd io.Reader) {
-	r.rd = io.new_buffered_reader(io.BufferedReaderConfig{
-		reader: rd
-	})
+pub fn (mut r Reader) reset(rd &net.TcpConn) {
+	r.rd = rd
 	r.w = 0
 	r.r = 0
 }
@@ -95,8 +92,14 @@ pub fn (mut r Reader) peek_reply_type() ?u8 {
 
 // read_line Return a valid reply, it will check the protocol or redis error,
 // and discard the attribute type.
-pub fn (mut r Reader) read_line() ?string {
-	line := r.rd.read_line()?
+pub fn (mut r Reader) read_line() !string {
+	mut line := r.rd.read_line()
+	if line == '' {
+		println('EOF  FFFFF')
+		return line
+	} else {
+		line = line.trim_space()
+	}
 
 	println('read_line: base line $line')
 
@@ -111,12 +114,12 @@ pub fn (mut r Reader) read_line() ?string {
 		}
 		proto.resp_blob_error {
 			println('resp err')
-			blob_error := r.read_string_reply(line)?
+			blob_error := r.read_string_reply(line)!
 			return IError(new_redis_error(blob_error))
 		}
 		proto.resp_attr {
 			println('attr')
-			r.discard(line)?
+			r.discard(line) or {return err}
 			return r.read_line()
 		}
 		else {
@@ -135,8 +138,12 @@ pub fn (mut r Reader) read_line() ?string {
 type Empty = u8
 type Any = Empty | RedisError | []Any | big.Integer | bool | f64 | i64 | map[voidptr]Any | string
 
-pub fn (mut r Reader) read_reply() ?Any {
-	line := r.read_line()?
+pub fn (mut r Reader) read_reply() !Any {
+	println('start reading line')
+	line := r.read_line() or {
+		println('read line error $err')
+		return err
+	}
 	println('read line resp $line')
 
 	match line[0] {
@@ -145,35 +152,35 @@ pub fn (mut r Reader) read_reply() ?Any {
 			return s
 		}
 		proto.resp_int {
-			i := strconv.parse_int(line[1..], 10, 64)?
+			i := strconv.parse_int(line[1..], 10, 64) or {return err}
 			return i
 		}
 		proto.resp_float {
-			f := r.read_float(line)?
+			f := r.read_float(line)!
 			return f
 		}
 		proto.resp_bool {
-			b := r.read_bool(line)?
+			b := r.read_bool(line)!
 			return b
 		}
 		proto.resp_big_int {
-			i := r.read_big_int(line)?
+			i := r.read_big_int(line)!
 			return i
 		}
 		proto.resp_string {
-			s := r.read_string_reply(line)?
+			s := r.read_string_reply(line)!
 			return s
 		}
 		proto.resp_verbatim {
-			v := r.read_verb(line)?
+			v := r.read_verb(line)!
 			return v
 		}
 		proto.resp_array, proto.resp_set, proto.resp_push {
-			s := r.read_slice(line)?
+			s := r.read_slice(line)!
 			return s
 		}
 		proto.resp_map {
-			m := r.read_map(line)?
+			m := r.read_map(line)!
 			return m
 		}
 		else {
@@ -182,12 +189,12 @@ pub fn (mut r Reader) read_reply() ?Any {
 	}
 }
 
-fn (mut r Reader) read_map(line string) ?map[voidptr]Any {
-	n := r.reply_len(line)?
+fn (mut r Reader) read_map(line string) !map[voidptr]Any {
+	n := r.reply_len(line)!
 
 	mut m := map[voidptr]Any{}
 	for i := 0; i < n; i++ {
-		k := r.read_reply()?
+		k := r.read_reply()!
 		v := r.read_reply() or {
 			if err.msg() != proto.nil_value.msg() {
 				return err
@@ -200,8 +207,8 @@ fn (mut r Reader) read_map(line string) ?map[voidptr]Any {
 	return m
 }
 
-fn (mut r Reader) read_slice(line string) ?[]Any {
-	n := r.reply_len(line)?
+fn (mut r Reader) read_slice(line string) ![]Any {
+	n := r.reply_len(line)!
 
 	mut val := []Any{len: n, init: Empty(0)}
 	for i := 0; i < n; i++ {
@@ -218,8 +225,8 @@ fn (mut r Reader) read_slice(line string) ?[]Any {
 	return val
 }
 
-fn (mut r Reader) read_verb(line string) ?string {
-	s := r.read_string_reply(line)?
+fn (mut r Reader) read_verb(line string) !string {
+	s := r.read_string_reply(line)!
 
 	if s.len < 4 || s[3] != `:` {
 		return error('redis: can\'t parse verbatim string reply: $line')
@@ -228,11 +235,11 @@ fn (mut r Reader) read_verb(line string) ?string {
 	return s[4..]
 }
 
-fn (mut r Reader) read_big_int(line string) ?big.Integer {
-	return big.integer_from_string(line[1..])
+fn (mut r Reader) read_big_int(line string) !big.Integer {
+	return big.integer_from_string(line[1..]) or { return err }
 }
 
-fn (mut r Reader) read_bool(line string) ?bool {
+fn (mut r Reader) read_bool(line string) !bool {
 	match line[1..] {
 		't' {
 			return true
@@ -246,7 +253,7 @@ fn (mut r Reader) read_bool(line string) ?bool {
 	}
 }
 
-fn (mut r Reader) read_float(line string) ?f64 {
+fn (mut r Reader) read_float(line string) !f64 {
 	match line[1..] {
 		'inf' {
 			return math.inf(1)
@@ -255,7 +262,7 @@ fn (mut r Reader) read_float(line string) ?f64 {
 			return math.inf(-1)
 		}
 		else {
-			return strconv.atof64(line[1..])
+			return strconv.atof64(line[1..]) or {return err}
 		}
 	}
 }
@@ -309,16 +316,16 @@ pub fn (mut r Reader) discard(line string) ? {
 	return error('redis: can\'t parse $line')
 }
 
-pub fn (mut r Reader) read_string_reply(line string) ?string {
-	n := r.reply_len(line)?
+pub fn (mut r Reader) read_string_reply(line string) !string {
+	n := r.reply_len(line)!
 
 	mut b := []u8{len: n + 2}
-	r.rd.read(mut b)?
+	r.rd.read(mut b) or {return err}
 	return b[..n].bytestr()
 }
 
-pub fn (mut r Reader) reply_len(line string) ?int {
-	n := strconv.atoi(line[1..])?
+pub fn (mut r Reader) reply_len(line string) !int {
+	n := strconv.atoi(line[1..]) or { return err }
 
 	if n < -1 {
 		return error('redis: invalid reply: $line')
