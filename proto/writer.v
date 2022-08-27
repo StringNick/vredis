@@ -21,13 +21,13 @@ pub fn new_writer(wr Writer_) &Writer {
 	}
 }
 
-pub fn (mut w Writer) write_args(args []string) ? {
-	w.writer.write_byte(resp_array)?
+pub fn (mut w Writer) write_args(args []string)! {
+	w.writer.write_byte(resp_array) or {return err}
 
-	w.write_len(args.len)?
+	w.write_len(args.len) or {return err}
 
 	for arg in args {
-		w.write_arg(arg)?
+		w.write_arg(arg) or {return err}
 	}
 }
 

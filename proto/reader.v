@@ -274,12 +274,12 @@ pub fn is_nil_reply(line string) bool {
 }
 
 // discard_next read and discard the data represented by the next line.
-pub fn (mut r Reader) discard_next() ? {
-	line := r.read_line()?
+pub fn (mut r Reader) discard_next() ! {
+	line := r.read_line()!
 	return r.discard(line)
 }
 
-pub fn (mut r Reader) discard(line string) ? {
+pub fn (mut r Reader) discard(line string) ! {
 	if line.len == 0 {
 		return error('redis: invalid line')
 	}
@@ -291,22 +291,22 @@ pub fn (mut r Reader) discard(line string) ? {
 		else {}
 	}
 
-	n := r.reply_len(line)?
+	n := r.reply_len(line)!
 	match line[0] {
 		proto.resp_blob_error, proto.resp_string, proto.resp_verbatim {
 			mut buf := []u8{len: n + 2}
-			r.rd.read(mut buf)?
+			r.rd.read(mut buf) or {return err}
 			return
 		}
 		proto.resp_array, proto.resp_set, proto.resp_push {
 			for i := 0; i < n * 2; i++ {
-				r.discard_next()?
+				r.discard_next() or {return err}
 			}
 			return
 		}
 		proto.resp_map, proto.resp_attr {
 			for i := 0; i < n * 2; i++ {
-				r.discard_next()?
+				r.discard_next() or {return err}
 			}
 			return
 		}

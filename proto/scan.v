@@ -6,13 +6,17 @@ const (
 
 pub fn scan<T>(v Any) !T {
 	$if T is string {
-		scan_type_string(v)!
+		return scan_type_string(v)
+	} $else $if T is i64 {
+		return scan_type_int(v)
+	} $else $if T is []string {
+		return scan_type_string_slice(v)
 	}
 
 	return err_wrong_result_type
 }
 
-pub fn scan_type_string(v Any) !string {
+fn scan_type_string(v Any) !string {
 	match v {
 		string {
 			return string(v)
@@ -23,7 +27,7 @@ pub fn scan_type_string(v Any) !string {
 	}
 }
 
-pub fn scan_type_int(v Any) !i64 {
+fn scan_type_int(v Any) !i64 {
 	match v {
 		i64 {
 			return v
@@ -35,7 +39,7 @@ pub fn scan_type_int(v Any) !i64 {
 	}
 }
 
-pub fn scan_type_string_slice(v Any) ![]string {
+fn scan_type_string_slice(v Any) ![]string {
 	match v {
 		[]Any {
 			mut result := []string{cap: v.len}

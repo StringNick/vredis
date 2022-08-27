@@ -101,7 +101,6 @@ fn (mut p ConnPool) check_min_idle_conns() {
 }
 
 fn (mut p ConnPool) add_idle_conn() ? {
-	println('add_idle_conn: start')
 	mut cn := p.dial_conn(context.todo(), true)?
 	p.conns_mu.@lock()
 
@@ -114,13 +113,11 @@ fn (mut p ConnPool) add_idle_conn() ? {
 		return pool.err_closed
 	}
 
-	println('add_idle_conn: successfully added new connection')
 	p.conns << cn
 	p.idle_conns << cn
 }
 
 fn (mut c ConnPool) dial_conn(ctx context.Context, pooled bool) ?Conn {
-	println('dialin connect')
 	if c.closed() {
 		return pool.err_closed
 	}
@@ -145,8 +142,6 @@ fn (mut c ConnPool) dial_conn(ctx context.Context, pooled bool) ?Conn {
 		}
 		return err
 	}
-
-	println('successfully dialed conn')
 
 	mut cn := new_conn(net_conn)
 	cn.pooled = pooled
@@ -307,8 +302,6 @@ pub fn (mut p ConnPool) put(ctx context.Context, mut cn Conn) {
 		p.remove(ctx, mut cn, none)
 		return
 	}
-
-	addr := voidptr(p)
 
 	p.conns_mu.@lock()
 	l := p.idle_conns.len

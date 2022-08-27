@@ -42,7 +42,7 @@ fn new_base_client(opt Options, pool pool.Pooler) &BaseClient {
 	}
 }
 
-type ConnCallback = fn (context.Context, mut pool.Conn) ?
+
 
 fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
 	println('get_conn: starting get conn')
@@ -66,6 +66,7 @@ fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
 	return cn
 }
 
+type ConnCallback = fn (context.Context, mut pool.Conn)!
 fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
 	println('with_conn: init')
 
@@ -145,23 +146,23 @@ fn (mut c BaseClient) process(mut ctx context.Context, mut cmd Cmd)! {
 	return last_err
 }
 
-fn (mut c BaseClient) process_(mut ctx context.Context, mut cmd Cmd, attempt int) ?bool {
+fn (mut c BaseClient) process_(mut ctx context.Context, mut cmd Cmd, attempt int) !bool {
 	if attempt > 0 {
 		// TODO: timeoutry
 	}
 
 	eprintln('process_: processing cmd: $attempt')
 	// retry_timeout := u32(1)
-	c.with_conn(mut ctx, fn [mut c, mut cmd] (ctx context.Context, mut cn pool.Conn) ? {
+	c.with_conn(mut ctx, fn [mut c, mut cmd] (ctx context.Context, mut cn pool.Conn)! {
 		eprintln('with conn anon fn')
-		mut wr := cn.with_writer(ctx, c.opt.write_timeout)?
-		write_cmd(mut wr, cmd)?
+		mut wr := cn.with_writer(ctx, c.opt.write_timeout)!
+		write_cmd(mut wr, cmd)!
 
 		// io.new_buffered_reader({reader: io.make_reader(con)})
 		// TODO: custom timeout for read
 		println('start reading response')
-		mut rd := cn.with_reader(ctx, c.opt.read_timeout)?
-		cmd.read_reply(mut rd)?
+		mut rd := cn.with_reader(ctx, c.opt.read_timeout)!
+		cmd.read_reply(mut rd)!
 		return
 	}) or {
 		println('with conn err $err')
