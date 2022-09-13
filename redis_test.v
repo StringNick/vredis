@@ -13,6 +13,7 @@ fn setup() &Client {
 		addr: '127.0.0.1:6379'
 		min_idle_conns: 50
 		pool_size: 50
+		password: 'SUPER_SECRET_PASSWORD'
 	}
 
 	mut cl := new_client(mut opt)
@@ -34,7 +35,7 @@ fn multithread_rpush(key string, i i64){
 		println('[thread#$val] rpush error $err')
 	}
 }
-
+/*
 fn test_multithreading() ! {
 	mut ctx := context.todo()
 
@@ -49,7 +50,7 @@ fn test_multithreading() ! {
 	lrange := cl.lrange(mut ctx, key, 0, -1) or { return err }
 	assert lrange.len == count
 	println('waited')
-}
+}*/
 
 fn test_get_set()! {
 	mut ctx := context.todo()
@@ -67,7 +68,7 @@ fn test_get_set()! {
 	del_count := cl.del(mut ctx, key)!
 	assert del_count == 1
 }
-
+/*
 fn test_lpush_lrange() ! {
 	mut ctx := context.todo()
 	key, val, val1 := 'test_list', 'val', 'val1'
@@ -114,4 +115,4 @@ fn test_flushall() ! {
 		assert err.msg() == nil_value.msg()
 		''
 	}
-}
+}*/

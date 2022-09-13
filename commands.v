@@ -51,7 +51,7 @@ pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, ex
 
 	c.f(mut ctx, mut cmd)!
 	res := proto.scan<string>(cmd.val)!
-	println('res $res')
+
 	if res != 'OK' {
 		return error(res)
 	}
@@ -140,3 +140,46 @@ pub fn (mut c Cmdble_) rpop(mut ctx context.Context, key string) !string {
 }
 
 // append, expire,
+
+fn(mut c Cmdble_) auth(mut ctx context.Context, password string) ! {
+	mut cmd := new_cmd('auth', password)
+	c.f(mut ctx, mut cmd)!
+	val := proto.scan<string>(cmd.val)!
+	if val != 'OK' {
+		return error('wrong result: $val')
+	}
+	return 
+}
+
+fn(mut c Cmdble_) auth_acl(mut ctx context.Context, username, password string) ! {
+	mut cmd := new_cmd('auth', username, password)
+	c.f(mut ctx, mut cmd)!
+	val := proto.scan<string>(cmd.val)!
+	if val != 'OK' {
+		return error('wrong result: $val')
+	}
+	return 
+}
+
+fn(mut c Cmdble_) hello(mut ctx context.Context, ver string, username string, password string, client_name string) !map[string]proto.Any {
+	mut args := []string{cap: 7}
+	
+	args << ['hello', ver]
+
+	if password != '' {
+		if username != '' {
+			args << ['auth', username, password]
+		} else {
+			args << ['auth', 'default', password]
+		}
+	}
+
+	if client_name != '' {
+		args << client_name
+	}
+
+	mut cmd := new_cmd(...args)
+	c.f(mut ctx, mut cmd)!
+	val := proto.scan<map[string]proto.Any>(cmd.val)!
+	return val
+}

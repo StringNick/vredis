@@ -54,7 +54,7 @@ mut:
 }
 
 pub fn new_conn_pool(opt Options) &ConnPool {
-	println('new_conn_pool')
+	//println('new_conn_pool')
 	mut p := &ConnPool{
 		opt: opt
 		last_dial_error: none
@@ -78,7 +78,7 @@ fn (mut p ConnPool) check_min_idle_conns() {
 		return
 	}
 
-	println('check_min_idle_conns')
+	//println('check_min_idle_conns')
 
 	for p.pool_size < p.opt.pool_size && p.idle_conns_len < p.opt.min_idle_conns {
 		p.pool_size++
@@ -129,7 +129,7 @@ fn (mut c ConnPool) dial_conn(ctx context.Context, pooled bool) ?Conn {
 	}
 
 	net_conn := c.opt.dialer(ctx) or {
-		println('dial error $err')
+		//println('dial error $err')
 
 		c.conns_mu.@lock()
 		c.last_dial_error = err
@@ -153,7 +153,7 @@ fn (mut c ConnPool) closed() bool {
 }
 
 fn (mut c ConnPool) try_dial() {
-	println('try_dial: started')
+	//('try_dial: started')
 	for {
 		if c.closed() {
 			return
@@ -172,9 +172,9 @@ fn (mut c ConnPool) try_dial() {
 }
 
 fn (mut p ConnPool) new_conn_(ctx context.Context, pooled bool) ?Conn {
-	println('new_conn_: new conn initiated')
+	//println('new_conn_: new conn initiated')
 	mut cn := p.dial_conn(ctx, pooled)?
-	println('new_conn_: dialed new conn')
+	//println('new_conn_: dialed new conn')
 	p.conns_mu.@lock()
 
 	defer {
@@ -195,7 +195,7 @@ fn (mut p ConnPool) new_conn_(ctx context.Context, pooled bool) ?Conn {
 		}
 	}
 
-	println('new_conn_: return new cn')
+//	println('new_conn_: return new cn')
 
 	return cn
 }
@@ -206,27 +206,27 @@ pub fn (mut p ConnPool) new_conn(ctx context.Context) ?Conn {
 
 // get returns existed connection from the pool or creates a new one.
 pub fn (mut p ConnPool) get(mut ctx context.Context) ?Conn {
-	println('pool_conn: get')
+	//println('pool_conn: get')
 	if p.closed() {
 		return pool.err_closed
 	}
 
 	p.wait_turn(mut ctx)?
-	println('pool_conn: waited turn')
+	//println('pool_conn: waited turn')
 	for {
 		//	time.sleep(time.second)
 		p.conns_mu.@lock()
 		mut cn := p.pop_idle(ctx) or {
 			p.conns_mu.unlock()
 			if err == error('pop_idle: empty') {
-				println('get: break and trying new conn')
+				//println('get: break and trying new conn')
 				break
 			}
-			println('get: pop_idle return err $err')
+			//println('get: pop_idle return err $err')
 			return err
 		}
 		p.conns_mu.unlock()
-		println('successfully poped connection')
+		//println('successfully poped connection')
 		/*
 		TODO: isHealthy
 		if p.is_stale_conn(mut cn) {
@@ -272,10 +272,10 @@ fn (mut p ConnPool) pop_idle(ctx context.Context) ?Conn {
 	if p.closed() {
 		return pool.err_closed
 	}
-	println('pop_idle: init $p.idle_conns.len')
+	//println('pop_idle: init $p.idle_conns.len')
 	n := p.idle_conns.len
 	if n == 0 {
-		println('pop_idle: empty')
+		//println('pop_idle: empty')
 		return error('pop_idle: empty')
 	}
 
@@ -297,15 +297,13 @@ fn (mut p ConnPool) pop_idle(ctx context.Context) ?Conn {
 
 pub fn (mut p ConnPool) put(ctx context.Context, mut cn Conn) {
 	// TODO: check bufferred content pool/pool
-	println("put: init $cn.pooled")
+	//println("put: init $cn.pooled")
 	if !cn.pooled {
 		p.remove(ctx, mut cn, none)
 		return
 	}
 
 	p.conns_mu.@lock()
-	l := p.idle_conns.len
-	println("put: idle_conns len $l")
 	p.idle_conns << cn
 	p.idle_conns_len++
 	p.conns_mu.unlock()

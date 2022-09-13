@@ -95,35 +95,28 @@ pub fn (mut r Reader) peek_reply_type() ?u8 {
 pub fn (mut r Reader) read_line() !string {
 	mut line := r.rd.read_line()
 	if line == '' {
-		println('EOF  FFFFF')
 		return line
 	} else {
 		line = line.trim_space()
 	}
 
-	println('read_line: base line $line')
 
 	match u8(line[0]) {
 		proto.resp_error {
-			println('resp err')
 			return IError(parse_error_reply(line))
 		}
 		proto.resp_nil {
-			println('resp nil')
 			return proto.nil_value
 		}
 		proto.resp_blob_error {
-			println('resp err')
 			blob_error := r.read_string_reply(line)!
 			return IError(new_redis_error(blob_error))
 		}
 		proto.resp_attr {
-			println('attr')
 			r.discard(line) or {return err}
 			return r.read_line()
 		}
 		else {
-			println('something else')
 		}
 	}
 
@@ -136,15 +129,12 @@ pub fn (mut r Reader) read_line() !string {
 }
 
 type Empty = u8
-type Any = Empty | RedisError | []Any | big.Integer | bool | f64 | i64 | map[voidptr]Any | string
+type Any = Empty | RedisError | []Any | big.Integer | bool | f64 | i64 | map[string]Any | string
 
 pub fn (mut r Reader) read_reply() !Any {
-	println('start reading line')
 	line := r.read_line() or {
-		println('read line error $err')
 		return err
 	}
-	println('read line resp $line')
 
 	match line[0] {
 		proto.resp_status {
@@ -189,10 +179,10 @@ pub fn (mut r Reader) read_reply() !Any {
 	}
 }
 
-fn (mut r Reader) read_map(line string) !map[voidptr]Any {
+fn (mut r Reader) read_map(line string) !map[string]Any {
 	n := r.reply_len(line)!
 
-	mut m := map[voidptr]Any{}
+	mut m := map[string]Any{}
 	for i := 0; i < n; i++ {
 		k := r.read_reply()!
 		v := r.read_reply() or {
@@ -202,7 +192,13 @@ fn (mut r Reader) read_map(line string) !map[voidptr]Any {
 
 			Empty(0)
 		}
-		m[&k] = v
+		match k {
+			string {
+				m[k] = v
+			} else {
+
+			}
+		}
 	}
 	return m
 }

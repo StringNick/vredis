@@ -45,22 +45,24 @@ fn new_base_client(opt Options, pool pool.Pooler) &BaseClient {
 
 
 fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
-	println('get_conn: starting get conn')
+	//println('get_conn: starting get conn')
 
-	mut cn := c.conn_pool.get(mut ctx)?
-	println('get_conn: got connect from pool')
+	mut cn := c.conn_pool.get(mut ctx) or {
+		return err
+	}
+	//println('get_conn: got connect from pool')
 
 	if cn.inited {
 		return cn
 	}
 
-	println('get_conn: init_conn')
-	c.init_conn(ctx, mut cn) or {
-		println('get_conn: err remove $err')
+	//println('get_conn: init_conn')
+	c.init_conn(mut ctx, mut cn) or {
+		//println('get_conn: err remove $err')
 		c.conn_pool.remove(ctx, mut cn, err)
 		return err
 	}
-	println('get_conn: init_conn_after')
+	//println('get_conn: init_conn_after')
 
 
 	return cn
@@ -68,27 +70,22 @@ fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
 
 type ConnCallback = fn (context.Context, mut pool.Conn)!
 fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
-	println('with_conn: init')
 
-	mut cn := c.get_conn(mut ctx) or { return err }
+	mut cn := c.get_conn(mut ctx) or { 
+		return err }
 	mut last_err := IError(none)
-	println('with_conn: get connect successfull')
 	defer {
-		println('with_conn: releasing connection')
 		c.release_conn(ctx, mut cn, error('123'))
 	}
 	// TODO: remove after fix
 	done := ctx.done()
-	eprintln('with_conn: started with conn')
 
 	match ctx {
 		context.EmptyContext {
-			eprintln('with_conn: turning conn')
 			f(ctx, mut cn) or { 
 				last_err = err
 				return err
 			}
-			println('with_conn: successfully executed')
 			return
 		} else {
 			
@@ -97,7 +94,7 @@ fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
 
 	d := chan IError{}
 	
-	eprintln('with_conn: try to go spawn')
+	//eprintln('with_conn: try to go spawn')
 	go fn (d chan IError, ctx context.Context, mut cn pool.Conn, f ConnCallback) {
 		f(ctx, mut cn) or {
 			d <- err
@@ -124,7 +121,7 @@ fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
 fn (mut c BaseClient) process(mut ctx context.Context, mut cmd Cmd)! {
 	mut last_err := IError(none)
 
-	println('process: start processing')
+	//println('process: start processing')
 
 	for attempt := 0; attempt < c.opt.max_retries; attempt++ {
 		retry := c.process_(mut ctx, mut cmd, attempt) or {
@@ -151,21 +148,18 @@ fn (mut c BaseClient) process_(mut ctx context.Context, mut cmd Cmd, attempt int
 		// TODO: timeoutry
 	}
 
-	eprintln('process_: processing cmd: $attempt')
 	// retry_timeout := u32(1)
 	c.with_conn(mut ctx, fn [mut c, mut cmd] (ctx context.Context, mut cn pool.Conn)! {
-		eprintln('with conn anon fn')
 		mut wr := cn.with_writer(ctx, c.opt.write_timeout)!
 		write_cmd(mut wr, cmd)!
 
 		// io.new_buffered_reader({reader: io.make_reader(con)})
 		// TODO: custom timeout for read
-		println('start reading response')
 		mut rd := cn.with_reader(ctx, c.opt.read_timeout)!
 		cmd.read_reply(mut rd)!
 		return
 	}) or {
-		println('with conn err $err')
+		//println('with conn err $err')
 		return err
 	}
 	// TODO: retry := shouldRetry(err, atomic.LoadUint32(&retryTimeout) == 1)
@@ -174,7 +168,7 @@ fn (mut c BaseClient) process_(mut ctx context.Context, mut cmd Cmd, attempt int
 }
 
 fn (mut c BaseClient) release_conn(ctx context.Context, mut cn pool.Conn, err IError) {
-	println('release connection')
+	//println('release connection')
     
 	c.conn_pool.put(ctx, mut cn)
 
@@ -186,17 +180,32 @@ fn (mut c BaseClient) release_conn(ctx context.Context, mut cn pool.Conn, err IE
 	}*/
 }
 
-fn (c BaseClient) init_conn(ctx context.Context, mut cn pool.Conn) ? {
-	println('init_conn: pooled=$cn.inited')
+fn (c BaseClient) init_conn(mut ctx context.Context, mut cn pool.Conn) ! {
 	if cn.inited {
 		return
 	}
 
 	cn.inited = true
-	println('init_conn: new_signle_pool_conn')
-	//mut conn_pool := pool.new_single_pool_conn(c.conn_pool, cn)
-//	_ = new_conn(c.opt, conn_pool)
-	println('init_conn: new_conn')
+
+	username := c.opt.username
+	password := c.opt.password
+	//println('init_conn: new_signle_pool_conn')
+	mut conn_pool := pool.new_single_pool_conn(c.conn_pool, cn)
+	mut conn := new_conn(c.opt, conn_pool)
+	conn.hello(mut ctx, '3', username, password, '') or {
+		return err
+	}
+
+
+	if password != ''{
+		if username != '' {
+			conn.auth_acl(mut ctx, username, password)!
+		} else {
+			conn.auth(mut ctx, password)!
+		}
+	}
+	
+	//println('init_conn: new_conn')
 	// TODO: pipeliner
 }
 
@@ -220,11 +229,14 @@ pub struct Conn {
 }
 
 fn new_conn(opt Options, conn_pool pool.Pooler) &Conn {
-	println('redis_new_conn')
+	//println('redis_new_conn')
+	mut b := new_base_client(opt, conn_pool)
 	return &Conn{
-		BaseClient: &BaseClient{
-			opt: opt
-			conn_pool: conn_pool
+		BaseClient: b,
+		Cmdble_: Cmdble_{
+			f: fn[mut b] (mut ctx context.Context, mut cmd Cmd)! {
+				b.process(mut ctx, mut cmd)!
+			}
 		}
 	}
 }

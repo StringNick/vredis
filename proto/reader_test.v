@@ -59,13 +59,3 @@ fn is_equal(a []u8, b []u8) bool {
 
 	return true
 }
-
-fn test_read_line() {
-	mut b := []u8{len: 8192, init: `a`}
-	b[b.len - 2] = `\r`
-	b[b.len - 1] = `\n`
-	buf := new_bytes_buffer_reader(b)
-	mut rd := new_reader(buf)
-	str := rd.read_line() or { panic(err) }
-	assert is_equal(b[..b.len - 2], str.bytes())
-}

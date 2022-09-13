@@ -11,6 +11,12 @@ pub fn scan<T>(v Any) !T {
 		return scan_type_int(v)
 	} $else $if T is []string {
 		return scan_type_string_slice(v)
+	} $else $if T is map[string]string {
+		return scan_type_string_map(v)
+	} $else $if T is map[string]Any {
+		return scan_type_map(v)
+	} $else {
+		println('unknown scan type')
 	}
 
 	return err_wrong_result_type
@@ -46,6 +52,34 @@ fn scan_type_string_slice(v Any) ![]string {
 
 			for val in v {
 				result << scan_type_string(val)!
+			}
+
+			return result
+		}
+		else {
+			return proto.err_wrong_result_type
+		}
+	}
+}
+
+fn scan_type_map(v Any) !map[string]Any {
+	match v {
+		map[string]Any {
+			return v
+		}
+		else {
+			return proto.err_wrong_result_type
+		}
+	}
+}
+
+fn scan_type_string_map(v Any) !map[string]string {
+	match v {
+		map[string]Any {
+			mut result := map[string]string{}
+
+			for k, val in v {
+				result[k] = scan_type_string(val)!
 			}
 
 			return result

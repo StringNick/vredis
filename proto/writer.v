@@ -36,7 +36,6 @@ fn (mut w Writer) write_len(n int) ? {
 	w.len_buf.clear()
 	w.len_buf << len.bytes()
 	w.len_buf << [u8(`\r`), `\n`]
-	println('write_len len=$n str="$w.len_buf.bytestr()" end')
 	w.writer.write(w.len_buf)?
 }
 
@@ -56,7 +55,6 @@ fn (mut w Writer) bytes(b []u8) ? {
 	w.writer.write_byte(resp_string)?
 	w.write_len(b.len)?
 	w.writer.write(b)?
-	println('write string $b.bytestr() len $b.len')
 	w.crlf()?
 }
 
