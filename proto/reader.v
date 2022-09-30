@@ -128,8 +128,7 @@ pub fn (mut r Reader) read_line() !string {
 	return line
 }
 
-type Empty = u8
-type Any = Empty | RedisError | []Any | big.Integer | bool | f64 | i64 | map[string]Any | string
+type Any = []Any | big.Integer | bool | f64 | i64 | map[string]Any | string | int
 
 pub fn (mut r Reader) read_reply() !Any {
 	line := r.read_line() or {
@@ -190,7 +189,7 @@ fn (mut r Reader) read_map(line string) !map[string]Any {
 				return err
 			}
 
-			Empty(0)
+			0
 		}
 		match k {
 			string {
@@ -206,16 +205,16 @@ fn (mut r Reader) read_map(line string) !map[string]Any {
 fn (mut r Reader) read_slice(line string) ![]Any {
 	n := r.reply_len(line)!
 
-	mut val := []Any{len: n, init: Empty(0)}
+	mut val := []Any{cap: n}
 	for i := 0; i < n; i++ {
 		v := r.read_reply() or {
 			if err.msg() != proto.nil_value.msg() {
 				return err
 			}
 
-			Empty(0)
+			0
 		}
-		val[i] = v
+		val << v
 	}
 
 	return val

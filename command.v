@@ -4,52 +4,13 @@ import proto
 
 struct BaseCmd {
 mut:
-	args    []string
+	args    []proto.Any
 	key_pos i8
 	err     string
 }
 
-pub fn (cmd BaseCmd) args() []string {
+pub fn (cmd BaseCmd) args() []proto.Any {
 	return cmd.args
-}
-
-pub fn (cmd BaseCmd) name() string {
-	if cmd.args.len == 0 {
-		return ''
-	}
-
-	return cmd.arg(0).to_lower()
-}
-
-pub fn (cmd BaseCmd) full_name() string {
-	name := cmd.name()
-	match name {
-		'cluster', 'command' {
-			if cmd.args.len == 1 {
-				return name
-			}
-			return name + ' ' + cmd.args[1]
-		}
-		else {
-			return name
-		}
-	}
-}
-
-pub fn (cmd BaseCmd) arg(pos int) string {
-	if pos < 0 || pos >= cmd.args.len {
-		return ''
-	}
-
-	return cmd.args[pos]
-}
-
-pub fn (cmd BaseCmd) first_key_pos() i8 {
-	return cmd.key_pos
-}
-
-pub fn (mut cmd BaseCmd) set_first_key_pos(key_pos i8) {
-	cmd.key_pos = key_pos
 }
 
 pub fn (mut cmd BaseCmd) set_err(err string) {
@@ -66,10 +27,27 @@ mut:
 	val proto.Any
 }
 
+
+pub struct ResultCmd<T> {
+	cmd &Cmd
+}
+
+fn (r ResultCmd<T>) value() !T {
+	return proto.scan<T>(r.cmd.val)
+}
+
+// TODO: proto.Any arguments
 pub fn new_cmd(args ...string) &Cmd {
+	// TODO: remove convert
+	mut any_args := []proto.Any{}
+
+	for _, a in args {
+		any_args << a
+	}
+
 	return &Cmd{
 		BaseCmd: BaseCmd{
-			args: args
+			args: any_args
 		}
 	}
 }

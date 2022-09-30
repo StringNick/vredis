@@ -8,6 +8,7 @@ pub const (
 	nil_value = proto.nil_value
 )
 
+[heap]
 struct BaseClient {
 	opt Options
 mut:
@@ -26,9 +27,7 @@ pub fn new_client(mut opt Options) &Client {
 	mut c := &Client{
 		BaseClient: b
 		Cmdble_: Cmdble_{
-			f: fn[mut b] (mut ctx context.Context, mut cmd Cmd)! {
-				b.process(mut ctx, mut cmd)!
-			}
+			f: b.process
 		}
 	}
 
@@ -39,6 +38,53 @@ fn new_base_client(opt Options, pool pool.Pooler) &BaseClient {
 	return &BaseClient{
 		opt: opt
 		conn_pool: pool
+	}
+}
+
+pub fn (mut c BaseClient) pipeline() &Pipeline {
+	mut pipe := Pipeline{
+		exec_: c.process_pipeline,
+	}
+	pipe.init()
+	return &pipe
+}
+
+fn (mut c BaseClient) process_pipeline(mut ctx context.Context, mut cmds []Cmd) ! {
+	unsafe {
+		c.general_process_pipeline(mut ctx, mut cmds, c.pipeline_process_cmds)!
+	}
+}
+
+fn (mut c BaseClient) general_process_pipeline(
+	mut ctx context.Context, mut cmds []Cmd, p fn(context.Context, mut pool.Conn, mut []Cmd)!bool)! {
+	c.with_conn(mut ctx, fn[p, mut cmds](ctx context.Context, mut cn pool.Conn) ! {
+		p(ctx, mut cn, mut cmds)!
+	}) or {
+		return err
+	}
+}
+
+fn write_cmds(mut wr proto.Writer, cmds []Cmd)! {
+	for _, cmd in cmds {
+		write_cmd(mut wr, cmd)!
+	}
+}
+
+pub fn (mut c BaseClient) pipeline_process_cmds(
+	ctx context.Context, mut cn pool.Conn, mut cmds []Cmd,
+) !bool {
+	mut wr := cn.with_writer(ctx, c.opt.write_timeout)!
+	write_cmds(mut wr, cmds)!
+
+	// io.new_buffered_reader({reader: io.make_reader(con)})
+	mut rd := cn.with_reader(ctx, c.opt.read_timeout)!
+	pipeline_read_cmds(mut rd, mut cmds)!
+	return true
+}
+
+fn pipeline_read_cmds(mut rd proto.Reader, mut cmds []Cmd) ! {
+	for _, mut cmd in mut cmds {
+		cmd.read_reply(mut rd)!
 	}
 }
 
@@ -69,13 +115,14 @@ fn (mut c BaseClient) get_conn(mut ctx context.Context) ?pool.Conn {
 }
 
 type ConnCallback = fn (context.Context, mut pool.Conn)!
+
 fn (mut c BaseClient) with_conn(mut ctx context.Context, f ConnCallback) ? {
 
 	mut cn := c.get_conn(mut ctx) or { 
 		return err }
 	mut last_err := IError(none)
 	defer {
-		c.release_conn(ctx, mut cn, error('123'))
+		c.release_conn(ctx, mut cn, IError('123'))
 	}
 	// TODO: remove after fix
 	done := ctx.done()
@@ -226,17 +273,20 @@ fn (mut c BaseClient) with_conn(ctx context.Context, f fn(context.Context, &pool
 pub struct Conn {
 	BaseClient
 	Cmdble_
+	StatefulCmdble
 }
 
 fn new_conn(opt Options, conn_pool pool.Pooler) &Conn {
 	//println('redis_new_conn')
 	mut b := new_base_client(opt, conn_pool)
+	
 	return &Conn{
 		BaseClient: b,
 		Cmdble_: Cmdble_{
-			f: fn[mut b] (mut ctx context.Context, mut cmd Cmd)! {
-				b.process(mut ctx, mut cmd)!
-			}
+			f: b.process,
+		},
+		StatefulCmdble: StatefulCmdble{
+			f: b.process,
 		}
 	}
 }
