@@ -37,17 +37,10 @@ fn (r ResultCmd<T>) value() !T {
 }
 
 // TODO: proto.Any arguments
-pub fn new_cmd(args ...string) &Cmd {
-	// TODO: remove convert
-	mut any_args := []proto.Any{}
-
-	for _, a in args {
-		any_args << a
-	}
-
+pub fn new_cmd(args ...proto.Any) &Cmd {
 	return &Cmd{
 		BaseCmd: BaseCmd{
-			args: any_args
+			args: args
 		}
 	}
 }

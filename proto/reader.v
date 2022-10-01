@@ -128,7 +128,8 @@ pub fn (mut r Reader) read_line() !string {
 	return line
 }
 
-type Any = []Any | big.Integer | bool | f64 | i64 | map[string]Any | string | int
+pub struct Empty {}
+type Any = Empty | []Any | big.Integer | bool | f64 | i64 | map[string]Any | string | int
 
 pub fn (mut r Reader) read_reply() !Any {
 	line := r.read_line() or {

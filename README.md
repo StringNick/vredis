@@ -8,7 +8,6 @@ for starting redis with password:
 
     docker run \
         -p 6379:6379 \
-        -v $PWD/data:/data \
         --name redis \
         -d redis:alpine redis-server --appendonly yes  --requirepass "test123" 
 

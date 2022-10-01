@@ -33,15 +33,15 @@ struct Cmdble_ {
 
 // set Redis `set key` command
 pub fn (mut c Cmdble_) set(mut ctx context.Context, key string, value string, expiration time.Duration) !ResultCmd<string> {
-	mut args := []string{len: 3, cap: 5}
-	args[0] = 'set'
-	args[1] = key
-	args[2] = value
+	mut args := []proto.Any{cap: 5}
+	args << [proto.Any('set'), proto.Any(key), proto.Any(value)]
 	if expiration > 0 {
 		if use_precise(expiration) {
-			args << ['px', format_ms(expiration)]
+			args << 'px'
+			args << format_ms(expiration)
 		} else {
-			args << ['ex', format_sec(expiration)]
+			args << 'ex'
+			args << format_sec(expiration)
 		}
 	} else if expiration == -1 { // TODO: const
 		args << 'keepttl'
@@ -67,10 +67,9 @@ pub fn (mut c Cmdble_) get(mut ctx context.Context, key string) !ResultCmd<strin
 }
 
 // rpush Redis `rpush key [values...]` return llen of key
-pub fn (mut c Cmdble_) rpush(mut ctx context.Context, key string, values ...string) !ResultCmd<i64> {
-	mut args := []string{len: 2, cap: 2 + values.len}
-	args[0] = 'rpush'
-	args[1] = key
+pub fn (mut c Cmdble_) rpush(mut ctx context.Context, key string, values ...proto.Any) !ResultCmd<i64> {
+	mut args := []proto.Any{cap: 2 + values.len}
+	args << [proto.Any('rpush'), proto.Any(key)]
 	args << values
 
 	mut cmd := new_cmd(...args)
@@ -82,7 +81,7 @@ pub fn (mut c Cmdble_) rpush(mut ctx context.Context, key string, values ...stri
 
 // rpush Redis `lpush key [values...]` return llen of key
 pub fn (mut c Cmdble_) lpush(mut ctx context.Context, key string, values ...string) !ResultCmd<i64> {
-	mut args := []string{len: 2, cap: 2 + values.len}
+	mut args := []proto.Any{len: 2, cap: 2 + values.len, init: proto.Any('')}
 	args[0] = 'lpush'
 	args[1] = key
 	args << values
@@ -120,9 +119,11 @@ pub fn (mut c Cmdble_) flushall(mut ctx context.Context) !ResultCmd<string> {
 
 // del Redis `del keys...` return count of deleted
 pub fn (mut c Cmdble_) del(mut ctx context.Context, keys ...string) !ResultCmd<i64> {
-	mut args := []string{cap: keys.len + 1}
+	mut args := []proto.Any{cap: keys.len + 1}
 	args << 'del'
-	args << keys
+	for _, k in keys {
+		args << k
+	}
 
 	mut cmd := new_cmd(...args)
 	c.f(mut ctx, mut cmd)!
@@ -175,15 +176,15 @@ fn(mut c StatefulCmdble) auth_acl(mut ctx context.Context, username string, pass
 }
 // TODO: make version int, args proto.Any
 fn(mut c StatefulCmdble) hello(mut ctx context.Context, ver string, username string, password string, client_name string) !ResultCmd<map[string]proto.Any> {
-	mut args := []string{cap: 7}
+	mut args := []proto.Any{cap: 7}
 	
-	args << ['hello', ver]
+	args << [proto.Any('hello'), proto.Any(ver)]
 
 	if password != '' {
 		if username != '' {
-			args << ['auth', username, password]
+			args << [proto.Any('auth'), proto.Any(username), proto.Any(password)]
 		} else {
-			args << ['auth', 'default', password]
+			args << [proto.Any('auth'), proto.Any('default'), proto.Any(password)]
 		}
 	}
 

@@ -36,7 +36,7 @@ pub fn (mut p Pipeline) len() int {
 	return ln
 }
 
-pub fn (mut p Pipeline) do(mut ctx context.Context, args ...string) &Cmd {
+pub fn (mut p Pipeline) do(mut ctx context.Context, args ...proto.Any) &Cmd {
 	mut cmd := new_cmd(...args)
 	p.process(ctx, mut cmd) or {}
 	return cmd
