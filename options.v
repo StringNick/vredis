@@ -14,7 +14,7 @@ pub mut:
 	password string
 	db       int = 1
 
-	dialer fn (context.Context, string) ?&net.TcpConn
+	dialer fn (context.Context, string) !&net.TcpConn
 	// max_retries - default 3; -1 disables retries.
 	max_retries int = 3
 	// Timeout for socket reads. If reached, commands will fail
@@ -64,8 +64,8 @@ pub mut:
 //			read_timeout: 6 * time.Second,
 //			max_retries:  2,
 //		}
-pub fn parse_url(redis_url string) ?Options {
-	u := urllib.parse(redis_url)?
+pub fn parse_url(redis_url string) !Options {
+	u := urllib.parse(redis_url)!
 
 	match u.scheme {
 		'redis', 'rediss' {
@@ -78,19 +78,15 @@ pub fn parse_url(redis_url string) ?Options {
 }
 
 fn (mut o Options) init() {
-	o.dialer = fn (ctx context.Context, addr string) ?&net.TcpConn {
+	o.dialer = fn (ctx context.Context, addr string) !&net.TcpConn {
 		// TODO: dial timeout
-
-
 		return net.dial_tcp(addr)
 	}
 }
 
-fn setup_tcp_conn(u urllib.URL) ?Options {
+fn setup_tcp_conn(u urllib.URL) !Options {
 	mut o := Options{}
-
 	o.username, o.password = get_user_password(u)
-
 	o.addr = u.hostname()
 	p := u.port()
 	if p != '' {
@@ -114,7 +110,7 @@ fn get_user_password(u urllib.URL) (string, string) {
 
 fn new_conn_pool(opt Options) &pool.ConnPool {
 	return pool.new_conn_pool(pool.Options{
-		dialer: fn [opt] (ctx context.Context) ?&net.TcpConn {
+		dialer: fn [opt] (ctx context.Context) !&net.TcpConn {
 			return opt.dialer(ctx, opt.addr)
 		}
 		pool_fifo: opt.pool_fifo

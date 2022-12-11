@@ -42,11 +42,11 @@ pub fn (mut cn Conn) set_used_at(tm time.Time) {
 	stdatomic.store_i64(&cn.used_at, tm.unix_time())
 }
 
-pub fn (mut conn Conn) close() ? {
+pub fn (mut conn Conn) close() ! {
 	return conn.net_conn.close()
 }
 
-pub fn (mut conn Conn) write(b []u8) ?int {
+pub fn (mut conn Conn) write(b []u8) !int {
 	return conn.net_conn.write(b)
 }
 

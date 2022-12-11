@@ -1,13 +1,14 @@
 module pool
 
 import context
+
 const err_default_sticky = error('sticky')
 
 pub struct SinglePoolConn {
 mut:
 	pool       Pooler
 	cn         Conn
-	sticky_err IError = err_default_sticky
+	sticky_err IError = pool.err_default_sticky
 }
 
 pub fn new_single_pool_conn(pool Pooler, cn Conn) &SinglePoolConn {
@@ -17,16 +18,16 @@ pub fn new_single_pool_conn(pool Pooler, cn Conn) &SinglePoolConn {
 	}
 }
 
-pub fn (mut p SinglePoolConn) new_conn(ctx context.Context) ?Conn {
+pub fn (mut p SinglePoolConn) new_conn(ctx context.Context) !Conn {
 	return p.pool.new_conn(ctx)
 }
 
-pub fn (mut p SinglePoolConn) close_conn(mut cn Conn) ? {
+pub fn (mut p SinglePoolConn) close_conn(mut cn Conn) ! {
 	return p.pool.close_conn(mut cn)
 }
 
-pub fn (mut p SinglePoolConn) get(mut ctx context.Context) ?Conn {
-	if p.sticky_err != err_default_sticky {
+pub fn (mut p SinglePoolConn) get(mut ctx context.Context) !Conn {
+	if p.sticky_err != pool.err_default_sticky {
 		return p.sticky_err
 	}
 
@@ -39,7 +40,7 @@ pub fn (mut p SinglePoolConn) remove(ctx context.Context, mut cn Conn, reason IE
 	p.sticky_err = reason
 }
 
-pub fn (mut p SinglePoolConn) close() ? {
+pub fn (mut p SinglePoolConn) close() ! {
 	p.sticky_err = err_closed
 	return
 }

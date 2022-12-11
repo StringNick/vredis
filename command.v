@@ -27,13 +27,12 @@ mut:
 	val proto.Any
 }
 
-
-pub struct ResultCmd<T> {
+pub struct ResultCmd[T] {
 	cmd &Cmd
 }
 
-fn (r ResultCmd<T>) value() !T {
-	return proto.scan<T>(r.cmd.val)
+fn (r ResultCmd[T]) value() !T {
+	return proto.scan[T](r.cmd.val)
 }
 
 // TODO: proto.Any arguments
@@ -65,6 +64,6 @@ fn (mut cmd Cmd) read_reply(mut rd proto.Reader) ! {
 	cmd.val = rd.read_reply()!
 }
 
-fn write_cmd(mut wr proto.Writer, cmd Cmd)! {
+fn write_cmd(mut wr proto.Writer, cmd Cmd) ! {
 	return wr.write_args(cmd.args())
 }
