@@ -1,6 +1,5 @@
 module proto
 
-import io
 import strconv
 import math
 import math.big
@@ -78,12 +77,12 @@ pub fn (mut r Reader) reset(rd &net.TcpConn) {
 
 // peek_reply_type returns the data type of the next response without advancing the Reader,
 // and discard the attribute type.
-pub fn (mut r Reader) peek_reply_type() ?u8 {
+pub fn (mut r Reader) peek_reply_type() !u8 {
 	mut buf := [u8(0)]
-	r.rd.read(mut buf)?
+	r.rd.read(mut buf)!
 
 	if buf[0] == proto.resp_status {
-		r.discard_next()?
+		r.discard_next()!
 		return r.peek_reply_type()
 	}
 
@@ -100,7 +99,6 @@ pub fn (mut r Reader) read_line() !string {
 		line = line.trim_space()
 	}
 
-
 	match u8(line[0]) {
 		proto.resp_error {
 			return IError(parse_error_reply(line))
@@ -113,11 +111,10 @@ pub fn (mut r Reader) read_line() !string {
 			return IError(new_redis_error(blob_error))
 		}
 		proto.resp_attr {
-			r.discard(line) or {return err}
+			r.discard(line) or { return err }
 			return r.read_line()
 		}
-		else {
-		}
+		else {}
 	}
 
 	// Compatible with RESP2
@@ -129,12 +126,11 @@ pub fn (mut r Reader) read_line() !string {
 }
 
 pub struct Empty {}
-type Any = Empty | []Any | big.Integer | bool | f64 | i64 | map[string]Any | string | int
+
+type Any = Empty | []Any | big.Integer | bool | f64 | i64 | int | map[string]Any | string
 
 pub fn (mut r Reader) read_reply() !Any {
-	line := r.read_line() or {
-		return err
-	}
+	line := r.read_line() or { return err }
 
 	match line[0] {
 		proto.resp_status {
@@ -142,7 +138,7 @@ pub fn (mut r Reader) read_reply() !Any {
 			return s
 		}
 		proto.resp_int {
-			i := strconv.parse_int(line[1..], 10, 64) or {return err}
+			i := strconv.parse_int(line[1..], 10, 64) or { return err }
 			return i
 		}
 		proto.resp_float {
@@ -174,7 +170,7 @@ pub fn (mut r Reader) read_reply() !Any {
 			return m
 		}
 		else {
-			return error('redis: can\'t parse $line')
+			return error('redis: can\'t parse ${line}')
 		}
 	}
 }
@@ -195,9 +191,8 @@ fn (mut r Reader) read_map(line string) !map[string]Any {
 		match k {
 			string {
 				m[k] = v
-			} else {
-
 			}
+			else {}
 		}
 	}
 	return m
@@ -225,7 +220,7 @@ fn (mut r Reader) read_verb(line string) !string {
 	s := r.read_string_reply(line)!
 
 	if s.len < 4 || s[3] != `:` {
-		return error('redis: can\'t parse verbatim string reply: $line')
+		return error('redis: can\'t parse verbatim string reply: ${line}')
 	}
 
 	return s[4..]
@@ -244,7 +239,7 @@ fn (mut r Reader) read_bool(line string) !bool {
 			return false
 		}
 		else {
-			return error('redis: can\'t parse bool reply: $line')
+			return error('redis: can\'t parse bool reply: ${line}')
 		}
 	}
 }
@@ -258,7 +253,7 @@ fn (mut r Reader) read_float(line string) !f64 {
 			return math.inf(-1)
 		}
 		else {
-			return strconv.atof64(line[1..]) or {return err}
+			return strconv.atof64(line[1..]) or { return err }
 		}
 	}
 }
@@ -291,32 +286,32 @@ pub fn (mut r Reader) discard(line string) ! {
 	match line[0] {
 		proto.resp_blob_error, proto.resp_string, proto.resp_verbatim {
 			mut buf := []u8{len: n + 2}
-			r.rd.read(mut buf) or {return err}
+			r.rd.read(mut buf) or { return err }
 			return
 		}
 		proto.resp_array, proto.resp_set, proto.resp_push {
 			for i := 0; i < n * 2; i++ {
-				r.discard_next() or {return err}
+				r.discard_next() or { return err }
 			}
 			return
 		}
 		proto.resp_map, proto.resp_attr {
 			for i := 0; i < n * 2; i++ {
-				r.discard_next() or {return err}
+				r.discard_next() or { return err }
 			}
 			return
 		}
 		else {}
 	}
 
-	return error('redis: can\'t parse $line')
+	return error('redis: can\'t parse ${line}')
 }
 
 pub fn (mut r Reader) read_string_reply(line string) !string {
 	n := r.reply_len(line)!
 
 	mut b := []u8{len: n + 2}
-	r.rd.read(mut b) or {return err}
+	r.rd.read(mut b) or { return err }
 	return b[..n].bytestr()
 }
 
@@ -324,7 +319,7 @@ pub fn (mut r Reader) reply_len(line string) !int {
 	n := strconv.atoi(line[1..]) or { return err }
 
 	if n < -1 {
-		return error('redis: invalid reply: $line')
+		return error('redis: invalid reply: ${line}')
 	}
 
 	match line[0] {

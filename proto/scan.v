@@ -4,7 +4,7 @@ const (
 	err_wrong_result_type = error('wrong_result_type')
 )
 
-pub fn scan<T>(v Any) !T {
+pub fn scan[T](v Any) !T {
 	$if T is string {
 		return scan_type_string(v)
 	} $else $if T is i64 {
@@ -19,7 +19,7 @@ pub fn scan<T>(v Any) !T {
 		println('unknown scan type')
 	}
 
-	return err_wrong_result_type
+	return proto.err_wrong_result_type
 }
 
 fn scan_type_string(v Any) !string {
@@ -39,7 +39,7 @@ fn scan_type_int(v Any) !i64 {
 			return v
 		}
 		else {
-			print('wrong_type $v')
+			print('wrong_type ${v}')
 			return proto.err_wrong_result_type
 		}
 	}

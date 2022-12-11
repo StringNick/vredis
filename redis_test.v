@@ -19,29 +19,22 @@ fn setup() &Client {
 	mut cl := new_client(mut opt)
 	time.sleep(5 * time.second)
 	mut ctx := context.todo()
-	res := cl.flushall(mut ctx) or {
-		panic('flushall error $err')
-	}
+	res := cl.flushall(mut ctx) or { panic('flushall error ${err}') }
 
-	val := res.value() or {
-		panic(err)
-	}
+	val := res.value() or { panic(err) }
 
 	if val != 'OK' {
-		panic('flushall setup not ok $res.value()')
+		panic('flushall setup not ok ${res.value()}')
 	}
 	return cl
 }
 
-
-fn multithread_rpush(key string, i i64){
+fn multithread_rpush(key string, i i64) {
 	mut ctx := context.todo()
 
 	val := strconv.format_int(i, 10)
-	println('[thread#$val] rpush init..')
-	cl.rpush(mut ctx, key, val) or {
-		println('[thread#$val] rpush error $err')
-	}
+	println('[thread#${val}] rpush init..')
+	cl.rpush(mut ctx, key, val) or { println('[thread#${val}] rpush error ${err}') }
 }
 
 fn test_multithreading() ! {
@@ -50,8 +43,8 @@ fn test_multithreading() ! {
 	count := 10
 	key := 'test_list_thread'
 	mut threads := []thread{}
-	for i := 0; i < count; i ++ {
-		threads << go multithread_rpush(key, i64(i))
+	for i := 0; i < count; i++ {
+		threads << spawn multithread_rpush(key, i64(i))
 	}
 	threads.wait()
 
@@ -60,13 +53,13 @@ fn test_multithreading() ! {
 	println('waited')
 }
 
-fn test_get_set()! {
+fn test_get_set() ! {
 	mut ctx := context.todo()
 	val := 'bar'
 	key := 'test_key'
 
 	cl.set(mut ctx, key, val, time.hour) or {
-		println('test_get_set: $err')
+		println('test_get_set: ${err}')
 		return err
 	}
 

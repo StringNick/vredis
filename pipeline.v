@@ -7,26 +7,24 @@ import sync
 pub struct Pipeline {
 	Cmdble_
 	StatefulCmdble
-	mut:
-		exec_ fn(mut context.Context, mut []Cmd)!
-		mu sync.Mutex
-		cmds []Cmd
+mut:
+	exec_ fn (mut context.Context, mut []Cmd) !
+	mu    sync.Mutex
+	cmds  []Cmd
 }
 
 fn (mut p Pipeline) init() {
 	p.Cmdble_ = Cmdble_{
-			f: fn[mut p] (mut ctx context.Context, mut cmd Cmd)! {
-				p.process(ctx, mut cmd)!
-			}
+		f: fn [mut p] (mut ctx context.Context, mut cmd Cmd) ! {
+			p.process(ctx, mut cmd)!
 		}
+	}
 	p.StatefulCmdble = StatefulCmdble{
-			f: fn[mut p] (mut ctx context.Context, mut cmd Cmd)! {
-				p.process(ctx, mut cmd)!
-			}
+		f: fn [mut p] (mut ctx context.Context, mut cmd Cmd) ! {
+			p.process(ctx, mut cmd)!
 		}
-	
+	}
 }
-
 
 pub fn (mut p Pipeline) len() int {
 	p.mu.@lock()
@@ -70,12 +68,12 @@ pub fn (mut p Pipeline) exec(mut ctx context.Context) ![]Cmd {
 	return cmds
 }
 
-pub fn (mut p Pipeline) pipelined(mut ctx context.Context, fun fn(Pipeline)!) ![]Cmd {
+pub fn (mut p Pipeline) pipelined(mut ctx context.Context, fun fn (Pipeline) !) ![]Cmd {
 	fun(p)!
 
 	return p.exec(mut ctx)
 }
 
-pub fn (mut p Pipeline) tx_pipelined(mut ctx context.Context, fun fn(Pipeline)!) ![]Cmd {
+pub fn (mut p Pipeline) tx_pipelined(mut ctx context.Context, fun fn (Pipeline) !) ![]Cmd {
 	return p.pipelined(mut ctx, fun)
 }
